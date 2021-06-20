@@ -2796,7 +2796,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         # print(data)
         
         parameters <- list(pars = startvals)
-        obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
+        # obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
 
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find the MLEs:
@@ -2889,19 +2889,54 @@ popan.func <- function(det.dat, setup.res, printit=T){
         #            control = list(parscale = param.scale)))
         
         # Call optimiser
+        # mle.res <- constrOptim(
+        #   theta = obj$par,
+        #   f = obj$fn,
+        #   grad = obj$gr,
+        #   ui = constraint.mat,
+        #   ci = constraint.vec,
+        #   control = list(parscale = param.scale)
+        # )
+        
+        # names(startvals) <- NULL
+        print(startvals)
+        print(data)
+        py_pop = popan_nll(pars = startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
+                           firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+                           constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+                           whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+                           pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
+        print("ok")
+        print(py_pop)
+
+        # py_grad = popan_grad(startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
+        #                    firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+        #                    constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+        #                    whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+        #                    pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
+        # print("ok")
+        # print(py_grad)
+        
+
+        # Try reticulated function
         mle.res <- constrOptim(
-          theta = obj$par,
-          f = obj$fn,
-          grad = obj$gr,
-          ui = constraint.mat,
-          ci = constraint.vec,
-          control = list(parscale = param.scale)
+                theta = startvals,
+                f = popan_nll,
+                # grad = popan_grad,
+                ui = constraint.mat,
+                ci = constraint.vec,
+                control = list(parscale = param.scale),
+                k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
+                firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+                constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+                whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+                pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind
         )
         
-        # print(mle.res)
+        print(mle.res)
         
         # Get estimated expected numbers alive and standard errors from TMB
-        exp_n_alive <- tail(summary(sdreport(obj)), k)
+        # exp_n_alive <- tail(summary(sdreport(obj)), k)
         # print(exp_n_alive)
 
         mle.params <- mle.res$par

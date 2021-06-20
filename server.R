@@ -5,7 +5,9 @@ shinyServer(function(input, output, session) {
   # I can maybe source most of this outside server? I just want to load
   # capow.dat inside so that each session gets its own CPenv...
   source("capow_tmb.R", local = T)
-
+  # source("capow.R", local = T)
+  set.seed(1)
+  
   # Source server logic for modules
   # What does the local = T do again?
   source("NavBarApp/ModelServer.R", local = T)
