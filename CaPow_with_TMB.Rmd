@@ -1,0 +1,526 @@
+---
+title: "CaPow with TMB"
+author: "Robin Aldridge-Sutton"
+date: "11/01/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+I moved the CaPow.dat file for this notebook to the notes folder.
+
+I have been modifying CaPow to use TMB to fit models more quickly using the gradient and hessian of the likelihood produced by automatic differentiation.  I have written the likelihood function into the required C++ template, compiled and linked it, used it to produce R functions for the likelihood and its gradient and hessian, and used these to find maximum likelihood estimates for several datasets and models.  I will investigate the performance of the TMB code here.
+
+The TMB and original versions of CaPow produce different results.  I will try to show that the TMB version is calculating the likelihood correctly, and that the differences are due to the optimisation process working better than in the original version.  
+
+The original code uses the nlm function to optimise the likelihood.  This requires parameters bounds, such as probability parameter values between 0 and 1, to be enforced manually.  It does this by using if statements to check parameter values within the negative log likelihood function.  This is not possible in TMB because any if statements that rely on parameter values are removed.  This is presumably because the results would not be amenable to automatic differentiation.  So the TMB version uses the nlminb function to optimise the likelihood instead.  This allows bounds on the parameters to be specified, but produces different results from nlm.  When the original code was written the results from nlm were thought to be better, but I think that the derivatives provided by TMB show that the opposite is true.
+
+I have modified a copy of the original code to use nlminb, and a copy of the TMB code to not use the gradient or hessian.  I will show that these produce the same results, and thus that the likelihood is being calculated correctly in the TMB code.  Then I will try to show that the results of the unmodified TMB code are better than those of the unmodified original coe.
+
+# Verifying the likelihood calculations of the TMB code
+
+I will simulate several datasets, from several different scenarios, and fit several different models to them, to show that the TMB code calculates the same likelihood values as the original code.  For convenience I will use the pre-made lambda-scenarios and models that are provided with CaPow, and some non-lambda scenario and models that Rachel sent me to develop my code last summer.  The folowing code loads the necessary objects and displays the non-lambda simulation scenario:
+
+```{r}
+load("SAVE")
+rachel.setup$truevals
+```
+
+Here N is the superpopulation size, lambda is the population growth rate, p1 to p5 are the capture probabilities over five capture occasions, pent1 to pent5 are the corresponding entry proportions, and phi1 to phi4 are the survival probabilities between consecutive occasions.
+
+Now I will load the CaPow simulation function, set the random number seed so that the results are reproducible, simulate a dataset using the scenario above, and display the first few rows:
+
+```{r}
+source("capow_tmb.R")
+set.seed(2020)
+sim.dat <- sim.func(rachel.setup$SimN, rachel.setup$SimTable)
+head(sim.dat)
+```
+
+This shows the capture histories of the first six animals over the five capture occasions.
+
+Now I will load the modified version of the original CaPow code, which uses nlminb, and use it to fit a model to this dataset:
+
+```{r}
+source("popan_original_nlminb.R")
+orig.minb.res <- popan.original.nlminb.func(sim.dat, rachel.setup)
+orig.minb.res
+```
+
+The convergence code is 0, representing conergence for nlminb, but the parameter estimates for pent2 to pent4 are terrible.  In fact this is a scenario and model that Rachel sent me specifically because my code was giving these results and she was concerned that there was an error.  Later I will try to show that it is a result of using nlminb, and that it actually represents a better optimisation outcome.  Unfortunately this may mean that it is the POPAN models that are performing worse than was thought.
+
+There are no variance estimates because nlminb does not calculate a hessian.
+
+Now I will fit the same model to the same dataset with the modified version of the TMB code which does not use automatic differentiation.
+
+```{r}
+source("popan_tmb_no_grad.R")
+tmb.no.grad.res <- popan.tmb.no.grad.func(sim.dat, rachel.setup)
+tmb.no.grad.res
+```
+
+The results look very similar, I will calculate the differences as proportions of the original values:
+
+```{r}
+abs(orig.minb.res - tmb.no.grad.res) / (orig.minb.res + 1e-16)
+```
+
+The largest difference is in the number of iterations, and is less than 2%.  The differences are thus plausibly due to rounding errors.
+
+Now I will repeat the process above for the other scenarios and models:
+
+```{r warning=F}
+# set.seed(2020)
+verify_tmb <- function(sim.setup, model.setup) {
+  sim.dat <- sim.func(sim.setup$SimN, sim.setup$SimTable)
+  orig.minb.res <- popan.original.nlminb.func(sim.dat, model.setup)
+  tmb.no.grad.res <- popan.tmb.no.grad.func(sim.dat, model.setup)
+  if(any(abs(orig.minb.res - tmb.no.grad.res) / (orig.minb.res + 1e-16) > 1e-1)) {
+    # Print results if any differences greater than 10% of the original estimates
+    print(orig.minb.res)
+    print(tmb.no.grad.res)
+  }
+  any(abs(orig.minb.res - tmb.no.grad.res) / (orig.minb.res + 1e-16) > 1e-1)
+}
+
+verify_tmb(rachel.setup, rachel2.setup)
+
+# The robin objects represent four combinations of two simulation scenarios and two models
+verify_tmb(robin1.setup, robin1.setup)
+verify_tmb(robin2.setup, robin2.setup)
+verify_tmb(robin3.setup, robin3.setup)
+verify_tmb(robin4.setup, robin4.setup)
+```
+
+This shows that none of the results are different by more than 10%.  The only significant differences I have seen are in the numbers of iterations.  I think that they can be attributed to differences in rounding errors affecting the optimiser.  I think that this shows that the TMB code is calculating the likelihood correctly.
+
+# Comparing the results of the TMB and original versions of CaPow
+
+Now I will look at the differences in the results of the TMB code and the original.  Last summer Rachel sent me a dataset for which her code produced apparently more reasonable results than mine.  Here are the true parameter values and her results:
+
+```{r}
+rachel.setup$truevals
+rachel.res
+```
+
+Here the convergence code of 2 represents convergence in nlm, and the parameter estimates are sane.  I understand that the "negative variances" have been a mystery until now, and along with the runtime one of the main reasons a paper about CaPow has not been published.  
+
+Now I will fit the same dataset with the TMB version of CaPow.  I will use the results above as the starting values, and the TMB version will display some information about them before calculating its own results:
+
+```{r}
+rachel3.setup <- rachel.setup
+rachel3.setup$startvals <- rachel.res[1:11]
+tmb.res <- popan.func(rachel.dat, rachel3.setup)
+tmb.res
+```
+
+The gradient at the parameter estimates for the original code (starting values) is displayed first.  In most cases, at a minimum of a function every component of the gradient is zero.  Unfortunately it seems that the original estimates are not at a minimum.  
+
+The eigenvalues of the hessian at the original estimates are printed next.  At a minimum all of the eigenvalues are either positive or zero, representing zero or upward curvature in all directions.  This positive semi-definite quality is what ensures that if the inverse exists it has positive values on the diagonal.  Unfortunately the estimates do not seem to be at a minimum, and the last eigenvalue is negative here, which explains the "negative variances" calculated.
+
+We can ignore the hessian rank which is next.
+
+The gradient at the estimates for the TMB code are printed next.  All components are zero except those corresponding to p1 and pent3 to pent5.  
+
+Skipping down to the estimates from the TMB code, we see that the convergence code is zero, which represents convergence in nlminb.  Here all of the pent estimates, and the p1 estimate, are terrible.  But the p1 and pent3 to pent5 estimates are especially bad, they are boundary estimates.  But this is kind of good news, because when the minimum of a function is on the boundary it is not required that the gradient be zero in those components.  
+
+In fact looking again at the gradient we see that it is negative in the p1 component, and positive in the pent3 to pent5 components.  Along with the zeros in the other componenets, this shows that the function is increasing in all directions moving these estimates away from their boundaries.  And this, along with the fact that the eigenvalues of the hessian at the estimates are all positive, representing upward curvature in all directions, shows that the estimates are indeed a minimum.  These positive eigenvalues also ensure that the variances calculated are all positive.  However the "variance" for p1 is quite surprising.  I wonder whether the inverse of the hessian can actually be used to estimate the variance for a non regular likelihood.  The proof seems to require regularity.  I think it might also assume that the gradient is zero at the minimum, which it is not here...
+
+Finally we can confirm that the negative log likelihood is indeed smaller at the TMB estimates.  I think that these observations together show that we should unfortunately prefer the terrible parameter estimates from the TMB code over the much nicer ones from the original code.  The problem is nlm has been lying to us in the same way as optim, in a admittedly highly nonlinear optimisation problem, as shown by the virtually verticle gradient at its estimates, and POPAN is not doing very well on this dataset.  On the other hand this is quite a challenging simulation scenario, which I defined with very little experience.  It has low survival rates and capture probabilities, probably resulting in few recaptures and low information datasets.
+
+Here is a nicer dataset from the same scenario, with results from the original and TMB versions of CaPow, but fitting a much less demanding model, with only one pent parameter.
+
+```{r}
+# source('popan_tmb_print_grad.R')
+load('SAVE.robin')
+rachel2.res
+rachel4.setup <- rachel2.setup
+rachel4.setup$startvals <- rachel2.res[1:8]
+tmb2.res <- popan.tmb.print.grad.func(rachel.dat, rachel.setup)
+tmb2.res <- popan.tmb.print.grad.func(rachel.dat, rachel4.setup)
+tmb2.res <- popan.tmb.print.grad.func(rachel.dat, robin5.setup) ## One param less
+
+```
+
+
+```{r}
+
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, rachel.setup)
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, rachel4.setup)
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, robin5.setup) ## One param less
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, robin6.setup) ## Two params less
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, robin7.setup) ## Min params
+tmb2.res <- popan.tmb.print.grad.func(rachel2.dat, robin10.setup) ## Min params, p defined
+
+rachel3.dat <- sim.func(rachel.setup$SimN, rachel.setup$SimTable)
+tmb2.res <- popan.tmb.print.grad.func(rachel3.dat, rachel4.setup)
+tmb2.res <- popan.tmb.print.grad.Ndef.func(rachel3.dat, robin16.setup) ## Ndefpvar
+tmb2.res <- popan.tmb.print.grad.Ndef.func(rachel3.dat, robin17.setup) ## Np1def
+tmb2.res <- popan.tmb.print.grad.Ndef.func(rachel3.dat, robin18.setup) ## Np5def
+tmb2.res <- popan.tmb.print.grad.func(rachel3.dat, robin5.setup) ## One param less
+tmb2.res <- popan.tmb.print.grad.func(rachel3.dat, robin6.setup) ## Two params less
+tmb2.res <- popan.tmb.print.grad.func(rachel3.dat, robin7.setup) ## Min params - bound est comes back!
+tmb2.res <- popan.tmb.print.grad.func(rachel3.dat, robin10.setup) ## Min params, p defined
+
+rachel4.dat <- sim.func(rachel.setup$SimN, rachel.setup$SimTable)
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, rachel4.setup)
+tmb2.res <- popan.tmb.print.grad.Ndef.func(rachel4.dat, robin16.setup) ## Ndefpvar
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin5.setup) ## One param less
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin6.setup) ## Two params less
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin12.setup) ## p1p5 defined
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin14.setup) ## phinp1p5 defined
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin13.setup) ## p1p2p3p5 defined
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin7.setup) ## Min params
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin10.setup) ## Min params, p defined
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin8.setup) ## Min params, phi defined
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin11.setup) ## Min params, pent defined
+tmb2.res <- popan.tmb.print.grad.Ndef.func(rachel4.dat, robin15.setup) ## Min params, N defined - Have to change optimiser bounds
+tmb2.res <- popan.tmb.print.grad.func(rachel4.dat, robin9.setup) ## Min params, phi and p defined
+
+ModelBuilder()
+SimBuilder()
+RemoveItems()
+source("capow_tmb.R")
+mlist <- modellist()
+length(mlist)
+mlist$M4.p1p5defined
+slist <- simlist()
+robin19.setup <- popan.setup.func(mlist$M5.Np5defined, slist[[4]])
+
+robin19.dat <- sim.func(robin19.setup$SimN, robin19.setup$SimTable)
+tmb2.res <- popan.tmb.print.grad.Ndef.func(robin19.dat, robin19.setup) ## Min params, phi and p defined
+
+# tmb2.res
+```
+
+Here the estimates are very similar, and the gradient at the original estimates is much better, while being zero at the TMB estimates again. The hessians at both estimates have many very large eigenvalues, and one very small one.  The almost-zero eigenvalue at the true minimum found by the TMB code suggests that this dataset is still quite low information.  I will now compute the ratio of the standard errors of the estimates to the estimates themselves.
+
+```{r}
+1  / tmb2.res[1:8] * sqrt(tmb2.res[9:16])
+```
+
+Yes, they are pretty large.  pent2 looks like the main offender.  
+
+Given the nonlinearity of the surface it seems prudent to check if there are multiple minima.  I will now start the optimiser from a set of starting values near the true values:
+
+```{r}
+rachel5.setup <- rachel2.setup
+rachel5.setup$startvals[1:8] <- rachel2.setup$startvals[1:8] * 0.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[1] <- rachel2.setup$startvals[1] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[3] <- rachel2.setup$startvals[3] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[4] <- rachel2.setup$startvals[4] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[5] <- rachel2.setup$startvals[5] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[6] <- rachel2.setup$startvals[6] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[7] <- rachel2.setup$startvals[7] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+rachel5.setup$startvals[8] <- rachel2.setup$startvals[8] * 1.5
+popan.func(rachel2.dat, rachel5.setup)
+```
+
+Only one minimum here.  What about the tougher dataset and model:
+
+```{r}
+rachel6.setup <- rachel.setup
+rachel6.setup$startvals[1:11] <- rachel.setup$startvals[1:11] * 0.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[1] <- rachel.setup$startvals[1] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[3] <- rachel.setup$startvals[3] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[4] <- rachel.setup$startvals[4] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[5] <- rachel.setup$startvals[5] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[6] <- rachel.setup$startvals[6] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[7] <- rachel.setup$startvals[7] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[8] <- rachel.setup$startvals[8] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[9] <- rachel.setup$startvals[9] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[10] <- rachel.setup$startvals[10] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+rachel6.setup$startvals[11] <- rachel.setup$startvals[11] * 1.5
+popan.func(rachel.dat, rachel6.setup)
+```
+
+Only one here too, kind of surprising.
+
+Now I will compare performance on the pre-made projects.
+
+```{r}
+robin1.dat <- sim.func(robin1.setup$SimN, robin1.setup$SimTable)
+orig.res <- popan.original.func(robin1.dat, robin1.setup)
+orig.res
+orig.startvals.setup <- robin1.setup
+orig.startvals.setup$startvals <- orig.res[1:4]
+tmb.res <- popan.func(robin1.dat, orig.startvals.setup)
+tmb.res
+```
+
+```{r}
+robin2.dat <- sim.func(robin2.setup$SimN, robin2.setup$SimTable)
+orig.res <- popan.original.func(robin2.dat, robin2.setup)
+orig.res
+orig.startvals.setup <- robin2.setup
+orig.startvals.setup$startvals <- orig.res[1:12]
+tmb.res <- popan.func(robin2.dat, orig.startvals.setup)
+tmb.res
+```
+
+```{r}
+robin3.dat <- sim.func(robin3.setup$SimN, robin3.setup$SimTable)
+orig.res <- popan.original.func(robin3.dat, robin3.setup)
+orig.res
+orig.startvals.setup <- robin3.setup
+orig.startvals.setup$startvals <- orig.res[1:4]
+tmb.res <- popan.func(robin3.dat, orig.startvals.setup)
+tmb.res
+```
+
+```{r}
+robin4.dat <- sim.func(robin4.setup$SimN, robin4.setup$SimTable)
+orig.res <- popan.original.func(robin4.dat, robin4.setup)
+orig.res
+orig.startvals.setup <- robin4.setup
+orig.startvals.setup$startvals <- orig.res[1:12]
+tmb.res <- popan.func(robin4.dat, orig.startvals.setup)
+tmb.res
+```
+
+OK, so for the pre-made projects the the estimates are again just slightly more accurate in TMB.  I should check more datasets where the TMB estimates look crazy.  Although I'm kind of convinced now, maybe do something more interesting.
+
+Do the pre made sims n models tomorrow.  Check CI coverage.  Check non converging datasets.  Compare with old version.  Check works with app. Compare power.
+
+Try to find a nonconverging dataset and model.  nlm doesn't seem to report them, just claims convergence.  nlminb reports singular convergence (non convergence) when one of the eigenvalues of the hessian is negative (always close to zero).  I guess it's claiming that the estimates, gradient, and hessian imply that this must be a minimum, and thus that the small negative eigenvalue is a numerical error representing a zero eigenvalue, is that right?  Anyway, very nice that it actually reports it as nonconvergence!  Eigen still sees that the hessian is not actually rank deficient though...  Would be cool to know more about this stuff...  It seems a bit arbitrary though because isn't there equal chance that a very small positive evalue is numerical error indicating identifiability?  I guess in that case it's just the difference between very high "variance" estimates and no estimates, so maybe it's not such a big deal but we should point out that parameter identifiability might not be principled here.  The "variance" estimates might still be useful in this way just as indicators of the relative levels of information in datasets even if we don't take them to be genuine variances.  It's also strange because the hessian doesn't mean much here because they're boundary estimates with nonzero gradients.  Unless it's analyzing the directions of curvature n gradient etc.  Could be for all I know, probably is...  Anyway, if the numerical error in TMB and eigen is small, then we are not finding any rank deficient hessians, and if not we can't really distinguish them from low-information and nonconverging datasets.  I mean I guess nlminb is claiming that the non-converging ones are nonidentifiable, and I am inclined to believe it.  So what I should say is that we can't do any better with eigen, than by using nlminb and looking at the "variances" of estimates.  I guess the reason I was so keen to do it with eigen was that I could not trust any optimizers, but nlminb seems to do so well with TMB that the problem seems to be pretty much solved.  If it holds up that's pretty fucking great news, and if noone's done it with popan this could still end up being a good thing to publish.  Chances are someone, nah pretty much definitely someone has done it though, with ADMB if not TMB.  Looks like it's done in "marked" in 2013, with 500 citations...  Not totally sure.  It has Popan, and admb for CJS (which they imply popan is a structure of), but it's not explicit if they're combined.  Nah seems like they are.  Oh well, that wasn't the idea anyway, this is supposed to be a nice tool for checking study design power with simulations, and now it'll be much more accurate and probably a lot faster, if possibly implying that fewer studies are good.  Actually for designs apart from my own weird one it seems to work basically the same as the original.  Need to check it out more.  Yeah, it might not actually change the results that much...  I guess I've established that it's reliable, but still haven't gotten into the performance much.  Should do that next.
+
+Whoops no, didn't notice.  There's actually a basically zero eigenvalue, as well as the very small negative one!  Yep, every time.  So yeah, pretty believable that it's really singular.  Doesn't actually happen that often.  Anyway awesome to have an optimiser you can trust, that enforces your bounds, and should run really fast.  Oh I guess we can compare our performance to Marked too, if we want.
+
+```{r}
+source("capow.R")
+source("capow_tmb.R")
+conv <- T
+count <- 0
+s <- proc.time()
+while (count < 100) {
+  # sim.dat <- sim.func(robin2.setup$SimN, robin2.setup$SimTable)
+  fit.res <- popan.func(sim.dat, robin1.setup)
+  # tmb.res
+  # conv <- tmb.res['code'] == 0
+  count <- count + 1
+}
+print(s - proc.time())
+
+fit.res
+orig.startvals.setup <- rachel.setup
+orig.startvals.setup$startvals <- orig.res[1:11]
+tmb.res <- popan.func(sim.dat, orig.startvals.setup)
+tmb.res
+```
+
+Ten times faster to sim with new code and fit in TMB.  For the smaller model.  Seems like the difference is bigger for the larger model.  More like 60 times faster...
+
+```{r}
+tmb.res <- popan.func(sim.dat, robin1.setup)
+tmb.res
+```
+
+```{r}
+orig.startvals.setup$startvals <- tmb.res[1:11]
+tmb.res <- popan.func(sim.dat, orig.startvals.setup)
+tmb.res
+```
+
+Let's see what the apps do with the new version.  Wait, do I need load setup objects?  Whatever.  Come back to it.
+
+The pre-made projects have already been run n can't be run again seems like.  unrun removes the results.
+
+```{r}
+source("capow_tmb.R")
+unrun.func()
+```
+Run this in console to avoid stupid long output in rmarkdown.
+Run()
+Takes about 4 seconds for 100 sims each.  3 minutes in original.
+
+```{r}
+Power()
+Plot()
+```
+
+Power results seem similar to original, though could be differences in number of datasets ignored due to boundary estimates.  Main results look randomly within 2% absolute power.  Plots look the same.  Do show boundary estimates for phi where the others don't.  But the others are very close, so that might be the only difference, and it might be very small.  CI coverage and means the same.  Looks like the estimate distribution is just shifted slightly towards the boundary.  Probably just those tricks pushing the estimates from nlm away from them a bit.  The original does get some boundary estimates though.
+
+The box plots don't represent the CI coverage, just the distributions of estimates.  The CI coverage is just reported at the top.  The CI plots show the CI coverage haha!
+
+Everything looks good.
+
+Next I should try swapping over to the new sim function from capow-fast.  Bit of trouble as hadn't accounted for gaps but looks like it's working now.  Might be good to go over it again and tidy it up.  Also doesn't seem so fast anymore?  Maybe cause I was printing all the gradients etc.  Yeah for sure.
+
+Seems like the regularity conditions for the hessian variance estimates are supplied by the asymptotic normality of the estimators?  So when the estimates are not on the boundaries, and are really at minima, and the hessian is really invertible(?), then the estimates are legitimate.
+
+Yeah, so testing's pretty much done.  Just tidy stuff up, write the report, send it to R n E, n we're done.
+
+getresult(“P1”)
+
+Trying the tough scenario in the app.  It warns that pent1 and p1 and pent5 and phi are indistinguishable.  pent5 should be OK with constant phi, but yeah p1 and pent1 may be the problem.  Actually I've had those boundary estimates with exactly phi and p1, as well as all the pents.  And problems with one pent imply problems with all the others.  It gives the same warning with just one pent parameter...?  No warning with constant p, with or without constant pent.  But it seems like with just one pent and phi, they can be identified, and then p1 can be identified(?)  Is it because one of the pent params is calculated, so even with the other pents you can't get the first and p1?  That seems true so then it's strange that nlminb converges.  Maybe it only converges when there are boundary estimates?  And then it still seems like the model should be identifiable when there's just one pent param, and no, actually it still seems like it should be when there are five, because the other four define the first one...  Seems like all of these should be identifiable with phi constant, and this warning probably just comes up when you have nonconstant p's and it's not a lambda model.  Let's go ahead and see what happens, also need to check if there's reporting on non convergence.
+
+```{r}
+ModelBuilder()
+SimBuilder()
+ProjectBuilder()
+unrun.func()
+```
+Run()
+
+Looks like the original version of the app had a bug for finding CI's for difficult scenarios.  Even though the estimates are still decent...
+
+Might just be because I'm asking for power from a non lambda model hahaha.  Yeah Plot() seems to work fine...  
+
+```{r}
+Plot()
+```
+
+Yeah, the number of boundary estimates/nonconverging datasets doesn't seem to be reported.  As for identifiability I should compare with an analytically nonidentifiable model, the saturated model.  It does seem like these should be identifiable in theory.  Can't see the proportion of datasets that don't converge.  Could also be masked by boundary estimates?  Nah, if not identifiable it seems like it must be everywhere...
+
+Yeah, even the saturated model seems to report convergence, unless nonconverging datasets are not being ignored?  So nonconvergence, NA and Inf, and negative variance estimates are removed from CI calculations.  I need to double-check that the flag thing is working.  Seems like boundary estimates should be causing Inf values.  And I'm getting them in the CI plots.  The old one seems to too though, just rarely.
+
+Ah!  You can see how many sims converged, etc, from the x-axis of the CI plots.  Might still be better to report separately though.
+
+Function doesn't seem to report Inf when it should.  C++ maybe doesn't do NaN but it looks like tmb should turn the floating point exception into a NaN, so I dunno why I'm not getting that with my boundary estimates!  Well, it seems like I can with enough (all) of them.  I guess some are OK then?  I mean the old function does sometimes give them.  And Rachel said they're sometimes ok.  So I guess I'll leave it.  Ask Rachel.  It seems like the original code either assumes boundary estimates give a flag result (NA or Inf) or else it ignores them...  Either way it seems to be missing some.  So it looks like we need to fix that.
+
+So it seems like the cases that are being removed from the tmb version are all negative variance cases.  So I guess its not as good at picking up on those as I thought.  Or maybe they're due to numerical error somehow?  Wait, at the boundaries of course the variances can be negative.  They're not real variances, that's the whole point!  We have to catch the boundary estimates and remove them!  And not just through a flag or negative variances or lack of convergence.  I can't just add them to the flag though, cause that might have other effects.  Might have to go into the CI function itself.  Also the power function for lambda models I guess.  Though the only boundary for lambda is zero, and I doubt we get that, so no big deal.  
+
+So yeah, just need to make CI coverage exclude boudary estimates, probably plot them in a different colour, and maybe report boundary estimate rates on plots.  But for now just tidy this report up to show R n E tomorrow.  Should be fun!  But definitely lots to fix up first.  Not gonna happen today though.
+
+I know that the tmb version is giving the right answers because I checked it against the original with nlminb.  That whole return flag shit is because of using nlm with tricks, and that's also the reason it was rarely getting boundary estimates and so they never dealt with them.
+
+I still feel like providing some kind of feedback on parameter identifiability, beyond the warning when building the models, would be really helpful.  I should have a look at the hessians for the saturated model.
+
+This article sets a threshold for nullity of eigenvalues like I was thinking.  They say the dimension of the matrix * the largest eigenvalue * 10^(-9).  Could be close to some I've seen.  I wonder if that's what nlminb does too.  Should have a look.  It's weird though because it all depends on the hessian being positive definite, and that seems to depend on not getting boundary estimates, right?
+
+OK, what it looks like to me is that the number of nonidentifiable parameters is equal to the number of zero eigenvalues according to the threshold above, plus the number of boundary estimates.  Works out for the rachel datasets above.  Actually no, I'm making shit up.  The boundary estimates do seem to be nonidentifiable parameters, but I have no idea if the null eigenvalues are too.  Reducing params reduces boundary est's, but do the null evalues remain?  Yes!  And do they leave on reducing more params?  The warning went away when I build the model!  I have to check the code that determines that warning.  No, the zero eigenvalue never goes away, in any dataset.  The boundary estimates do exactly though.  It could be intrinsically non-identifiable parameters, though that's surprising with such few param's, if it's something that's not already known about.  I could try actually setting the remaining params to their true values.  The p's seem to do it, could be cause there are 5 though.  Could try setting one at a time.  Not tonight though, exhausted.  Interesting stuff though.
+
+```{r}
+# Figuring out how to make new setup objects manually.
+# Have to source each time something changed(?)
+source("capow_tmb.R")
+
+# Gets list of models from it's own environment
+mlist <- modellist()
+length(mlist)
+mlist[[9]]
+
+# Gets list of sims from it's own environment
+slist <- simlist()
+length(slist)
+slist[[1]]
+
+# Create setup object
+robin1.setup <- popan.setup.func(mlist[[1]], slist[[1]])
+robin2.setup <- popan.setup.func(mlist[[2]], slist[[1]])
+robin3.setup <- popan.setup.func(mlist[[1]], slist[[2]])
+robin4.setup <- popan.setup.func(mlist[[2]], slist[[2]])
+robin1.setup
+save(robin1.setup, robin2.setup, robin3.setup, robin4.setup, file = "SAVE.robin")
+robin5.setup <- popan.setup.func(mlist[[9]], slist[[3]])
+```
+
+
+Need to use nhist for lower bound on N (I am doing that!), and use constrOptim to make lambda stay above phi?  Yep do that later.
+
+We can also see the eigenvector corresponding to the small eigenvalue:
+
+```{r}
+popan.func(rachel2.dat, rachel2.setup)
+```
+
+This doesn't really work because the eigenvectors are not orthogonal.  Since there are a full set we could do the spectral decomposition but it still wouldn't be that helpful because they would still all have values of all components...  The variances are the way to do it I guess.
+
+I actually think orthogonalising the evectors might tell us something, but maybe not more than the variances.
+
+What about trying gridsearch with optimisation?  Should definitely check it out.
+
+
+
+Now I will show how the TMB code does on the pre-made scenarios and models
+
+The rachel.setup file specifies fitting a model where pent2 to pent5 can all take different values, whereas the rachel2.setup file assumes that they are all identical (pent1 is defined by pent2 to pent5 as they must add to one):
+
+```{r}
+tail(rachel.setup$allparvec, 5)
+tail(rachel2.setup$allparvec, 5)
+```
+
+The latter model is more likely to fit successfully because there are fewer parameters so less information is required from the dataset to distinguish them.  Here are the results of Rachel's code to fit this model to the rachel2 dataset:
+
+```{r}
+rachel2.res
+```
+
+These results are sensible.  We can check that the TMB version of CaPow gets very similar results.  
+
+This loads the TMB version of CaPow (the first time this is done will take ~15 seconds for the C++ file to be compiled):
+
+```{r}
+source('capow_tmb.R')
+```
+
+Here are the results of the TMB code to fit this model to the rachel2 dataset:
+
+```{r}
+robin2.res <- popan.func(rachel2.dat, rachel2.setup)
+robin2.res
+# Ok, this looks really close to identifiability.  Gradient zero, and one hessian eigenvalue very close to zero while all others large and positive.  Maybe not identifiability, but dataset definitely stretched to identify model.  Surprisingly good estimates though!  Even nlm doing well.
+# Oh, I know what I should be doing!  I should be looking at the datasets where it doesn't converge!!!  Check their hessians!!!  Yeah, exactly.  Rachel picked up on the shittiest datasets that still converge, thinking that my code was wrong, where in fact her optimiser was wrong, my code was right, and she's throwing away all the datasets with identifiability issues!  Well, not sure about the last one, but it's an exciting possibility.  Should also check the ones where the hessian is singular, even if convergence is claimed, of course.
+```
+
+They are very similar to the results of the original code.
+
+rachel.dat is a dataset for which the code I sent Rachel estimated some of the pent parameters at the lower bound of 0.001, whereas her code gives more reasonable estimates.  It also gives negative values for the approximations of the variances of the estimates of N and p1.  These are probably due to numerical errors, and possibly parameter identifiability issues, which I will discuss later.  Here are the results of Rachel's code for this dataset:
+
+```{r}
+rachel.res
+```
+
+The results of the TMB code for the dataset above are different.  Some of the estimates are closer to the true values, like N and phi1.  Some are much worse, like pent2.  Some of the pent parameters are estimated at the lower bound of zero.  The variances of some parameters are negative as with Rachel's code.  The convergence code is different but also signified convergence, as explained below.  But the negative log likelihood is lower (better) at these estimates, so as long as the likelihood function is calculated correctly they should be preferred.  Here are the results of the TMB code for the dataset above:
+
+```{r}
+robin.res <- popan.func(rachel.dat, rachel.setup)
+robin.res
+# Supplying the hessian to nlminb gives even crazier estimates, still on the boundaries, but with an even better nll, and now no negative "variances".  Two of the eigenvalues of the hessian are now close to zero.  I think this dataset is not informative enough for this model, probably by two parameters.  Let's try simpler models and see.
+
+# The negative variances are due to saddlepoints, indicating multimodality of the likelihood.  Seems like actually starting the optimiser from multiple points would be a good idea.  Do your gridsearch through the optimiser.  Start with two values of each parameter.  Actually they're not saddlepoints since the gradient isn't zero...  Probably don't have to worry if I don't see anymore negative variances now that I'm using the hessian.  Fuck this is cool.  And Popan is still relevant, people are still publishing packages with it as of last month I think.
+```
+
+Why are the population sizes determined?
+
+I guess it's not identifiability cause we're not getting zero gradients anywhere, it's just a really atypical dataset.  The MLEs for this dataset are just really bad haha.  Just an outlier dataset I guess.  Will be really interesting to see what popan performance looks like with these much better model fits.  Jesus, it looks like some of the nlm ones are just bullshit.  And it seems like what Rachel was interpretting as better performance over nlminb might actually just be covering up shitty popan performance... :(  Could be pretty bad news actually...  Still, could be very important news for the research community.  If it's true, and you can convince people.  Seems unlikely that people would've missed it though...  Or maybe Rachel hadn't compared the performance.
+
+```{r}
+head(rachel.dat)
+colSums(rachel.dat)
+colSums(rachel2.dat)
+nrow(rachel.dat)
+nrow(rachel2.dat)
+rachel.setup$truevals
+table(rowSums(rachel.dat))
+table(rowSums(rachel2.dat))  ## ~50% more animals recaptured (32/218 vs 22/217), this is the difference
+# Small capture probabilities, low phi, small pent proportions after the first.  Small N.  I'd say this is a challenging scenario and an average or bad dataset.  Should try some different scenarios and datasets.
+```
+
+So it might not be parameter identifiability, it might just be nlm failing, and popan giving shitty estimates for this dataset.  They are very shitty though, but it is a challenging scenario, and a shitty dataset.  Try others, and probably also just double check that the likelihood is specified correctly.  Maybe compare with other popan software?
+
+I'm still excited about the possibility of using the hessian to diagnose parameter nonidentifiability.
+
+The number of iterations is much larger for the nlminb versions of the code, but smaller for the TMB one than the original.
