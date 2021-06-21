@@ -2963,8 +2963,9 @@ popan.func <- function(det.dat, setup.res, gradtol=1e-4, printit=T){
         ## ------------------------------------------------------------------------------------------------------------------
         ## If not getting an invertible Hessian, sometimes helps to reduce gradtol, e.g. 1e-4 can be better than 1e-6:
         mle.res <- nlm(negloglike.func, p=startvals, hessian=T, typsize=startvals, iterlim=500, gradtol=gradtol)
+        print(negloglike.func(startvals))
         print(mle.res)
-
+        
         mle.params <- mle.res$estimate
         names(mle.params) <- pars.estvec
 

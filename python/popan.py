@@ -22,7 +22,6 @@ def popan_nll(
     # Replace any parameter slots with parameters-to-be-estimated in allvalues 
     # with their current values from pars
     allvalues = constvalues
-    pars = pars
     for i in range(len(indsinsertintoallvalues)):
         allvalues[int(indsinsertintoallvalues[i])] = pars[int(whichparsintoallvalues[i])]
 
@@ -75,7 +74,6 @@ def popan_nll(
         for j in range(newphiminindex, phiminindex):
             psurvivegap = psurvivegap * phivec[j]
 
-            
         chivec = chivec.at[i].set(1 - psurvivegap[i] + psurvivegap[i] * (1 - pvec[ i -1]) * chivec[i + 1])
         phiminindex = newphiminindex
 
@@ -101,6 +99,34 @@ def popan_nll(
         jnp.sum(jnp.array(noncaps) * jnp.log(pveccomp)) - \
         jnp.sum(jnp.array(survives) * jnp.log(psurvivegap))
 
-    return nllike.item()
+    return nllike
 
-# popan_grad = grad(popan_nll, argnums=(0))
+popan_grad = grad(popan_nll, argnums=(0))
+
+def popan_nll_item(
+    pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+    survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues, 
+    phiinds, pentinds, pinds, Nind, lambdaind, calcind
+):
+    return popan_nll(
+        pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues, 
+        phiinds, pentinds, pinds, Nind, lambdaind, calcind
+    ).item()
+
+def popan_grad_ary(
+    pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+    survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues, 
+    phiinds, pentinds, pinds, Nind, lambdaind, calcind
+):
+    grad_jnp_list = popan_grad(
+        pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues, 
+        phiinds, pentinds, pinds, Nind, lambdaind, calcind
+    )
+    n_grads = len(grad_jnp_list)
+    grad_list = [None] * n_grads
+    for i in range(n_grads):
+        grad_list[i] = grad_jnp_list[i].item()
+        
+    return grad_list
