@@ -2796,7 +2796,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         # print(data)
         
         parameters <- list(pars = startvals)
-        # obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
+        obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
 
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find the MLEs:
@@ -2889,70 +2889,70 @@ popan.func <- function(det.dat, setup.res, printit=T){
         #            control = list(parscale = param.scale)))
         
         # Call optimiser
-        # mle.res <- constrOptim(
-        #   theta = obj$par,
-        #   f = obj$fn,
-        #   grad = obj$gr,
-        #   ui = constraint.mat,
-        #   ci = constraint.vec,
-        #   control = list(parscale = param.scale)
-        # )
-        
-        library(reticulate)
-        source_python("python/popan.py")
-        print(startvals)
-        r_py_nll <- function(
-                pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
-                survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
-                phiinds, pentinds, pinds, Nind, lambdaind, calcind
-        ) {
-                py_pop = popan_nll_item(
-                        pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
-                        survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
-                        phiinds, pentinds, pinds, Nind, lambdaind, calcind
-                )
-        }
-        r_py_grad <- function(
-                pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
-                survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
-                phiinds, pentinds, pinds, Nind, lambdaind, calcind
-        ) {
-                py_pop = popan_grad_ary(
-                        pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
-                        survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
-                        phiinds, pentinds, pinds, Nind, lambdaind, calcind
-                )
-        }
-        py_pop = r_py_nll(pars = startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
-                           firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
-                           constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
-                           whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
-                           pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
-        print("nll")
-        print(py_pop)
-
-        py_grad = r_py_grad(startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist,
-                           firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
-                           constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
-                           whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
-                           pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
-        print("grad")
-        print(py_grad)
-        
-        # Try reticulated function
         mle.res <- constrOptim(
-                theta = startvals,
-                f = r_py_nll,
-                grad = r_py_grad,
-                ui = constraint.mat,
-                ci = constraint.vec,
-                control = list(parscale = param.scale),
-                k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
-                firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
-                constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
-                whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
-                pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind
+          theta = obj$par,
+          f = obj$fn,
+          grad = obj$gr,
+          ui = constraint.mat,
+          ci = constraint.vec,
+          control = list(parscale = param.scale)
         )
+        
+        # library(reticulate)
+        # source_python("python/popan.py")
+        # print(startvals)
+        # r_py_nll <- function(
+        #         pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        #         survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
+        #         phiinds, pentinds, pinds, Nind, lambdaind, calcind
+        # ) {
+        #         py_pop = popan_nll_item(
+        #                 pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        #                 survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
+        #                 phiinds, pentinds, pinds, Nind, lambdaind, calcind
+        #         )
+        # }
+        # r_py_grad <- function(
+        #         pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        #         survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
+        #         phiinds, pentinds, pinds, Nind, lambdaind, calcind
+        # ) {
+        #         py_pop = popan_grad_ary(
+        #                 pars, k, lambdamodel, gapvec, nhist, firsttab, lasttab, caps, noncaps,
+        #                 survives, constvalues, indsinsertintoallvalues, whichparsintoallvalues,
+        #                 phiinds, pentinds, pinds, Nind, lambdaind, calcind
+        #         )
+        # }
+        # py_pop = r_py_nll(pars = startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
+        #                    firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+        #                    constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+        #                    whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+        #                    pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
+        # print("nll")
+        # print(py_pop)
+        # 
+        # py_grad = r_py_grad(startvals, k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist,
+        #                    firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+        #                    constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+        #                    whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+        #                    pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
+        # print("grad")
+        # print(py_grad)
+        # 
+        # # Try reticulated function
+        # mle.res <- constrOptim(
+        #         theta = startvals,
+        #         f = r_py_nll,
+        #         grad = r_py_grad,
+        #         ui = constraint.mat,
+        #         ci = constraint.vec,
+        #         control = list(parscale = param.scale),
+        #         k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
+        #         firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
+        #         constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+        #         whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
+        #         pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind
+        # )
         
         print(mle.res)
         
