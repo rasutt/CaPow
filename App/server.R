@@ -12,13 +12,13 @@ shinyServer(function(input, output, session) {
   # What does the local = T do again?
   source("NavBarApp/ModelServer.R", local = T)
   source("NavBarApp/FitSummaryServer.R", local = T)
-  source("NavBarApp/UploadServer.R", local = T)
-  source("NavBarApp/FitModelServer.R", local = T)
-  source("NavBarApp/ViewDataServer.R", local = T)
-  source("NavBarApp/ParameterEstimatesServer.R", local = T)
-  source("NavBarApp/ModelCompServer.R", local = T)
-  source("NavBarApp/PopulationEstimatesServer.R", local = T)
-  source("NavBarApp/ViewPopPlotsServer.R", local = T)
+  source("NavBarApp/FitBuilder/UploadServer.R", local = T)
+  source("NavBarApp/FitBuilder/FitModelServer.R", local = T)
+  source("NavBarApp/FitBuilder/ViewDataServer.R", local = T)
+  source("NavBarApp/FitBuilder/ParameterEstimatesServer.R", local = T)
+  source("NavBarApp/FitBuilder/ModelCompServer.R", local = T)
+  source("NavBarApp/FitBuilder/PopulationEstimatesServer.R", local = T)
+  source("NavBarApp/FitBuilder/ViewPopPlotsServer.R", local = T)
   source("NavBarApp/SimServer.R", local = T)
   source("NavBarApp/SummaryServer.R", local = T)
   source("NavBarApp/ProjectBuilderServer.R", local = T)
@@ -26,8 +26,7 @@ shinyServer(function(input, output, session) {
   source("NavBarApp/PowerServer.R", local = T)
   source("NavBarApp/PlotServer.R", local = T)
   source("NavBarApp/RemoveServer.R", local = T)
-  source("NavBarApp/LoadServer.R", local = T)
-  source("NavBarApp/SaveServer.R", local = T)
+  source("NavBarApp/SaveLoadServer.R", local = T)
   
   # Create reactive list of reactive-value lists for objects to pass between modules
   capow_list <- reactive(

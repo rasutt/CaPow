@@ -2,16 +2,16 @@
 
 # *** First priority ***
 
-# Fix Error in popan.func: object 'exp_n_alive' not found, when fitting model
+# Tidy up module files and write explanation.
 
-# Note somewhere that the main diff with R’s original model-fitting code was
-# that using nlminb rather than nlm with artificial bounds allowed results on
-# the bounds, when there should be.
+# Tidy up code to load module UIs.
 
-# If I don't have one already, an example to show boundary estimates with
+# If I don't have one already, make an example to show boundary estimates with
 # plausible variance estimates, and make sure code reports them but notes that
 # they're illegitimate.  Also one that shows failure to converge.  Write down all
 # my examples.
+
+# Tidy up MatLay function in CaPowGUIFuncs.R
 
 # Fix confusing error when try to display power plot for lambda for non-lambda
 # models. And non estimated parameters generally?  This has caused long
