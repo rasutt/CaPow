@@ -1,12 +1,12 @@
 ### CaPow!
 
-A Shiny web app for capture-recapture model fitting and study design via fast simulation and automatic differentiation in R using TMB.
+A Shiny web app for capture-recapture model fitting and study design via fast simulation and optimisation using automatic differentiation.
 
 #### General notes
 
-- I started writing code to use jax in python to find the nll and do automatic differentiation.  I made some progress but I'm not sure I got it working.  Now TMB is working perfectly so I'm going back to it.
+- I had a lot of trouble with TMB not compiling or giving random errors, but it seems to be working again now.
 
-- I had a lot of trouble with TMB not compiling or giving random errors.  I'm still not sure what the problem was.  After reinstalling windows it worked I think.  Just gonna have to get really expert with it.  Got time now.  And it's really cool stuff.
+- I started writing code to use jax in python to find the nll and do automatic differentiation.  I made some progress but I'm not sure I got it working.
 
 #### Files and folders
 
