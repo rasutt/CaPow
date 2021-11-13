@@ -12,7 +12,7 @@ library(TMB)
 
 # Trying to source in ui.R so I can source this file in server.R
 # source("CaPowGUIFuncs.R")
-source("CaPowGUI.R", local = T)
+# source("CaPowGUI.R", local = T)
 
 # Trying to get CPenv into session environment, so maybe easier outside of function
 # CPinit()
