@@ -1,10 +1,17 @@
 # Things to do:
 
-# *** Files to send Rachel ***
-
-# All
-
 # *** First priority ***
+
+# Fix Error in popan.func: object 'exp_n_alive' not found, when fitting model
+
+# Note somewhere that the main diff with R’s original model-fitting code was
+# that using nlminb rather than nlm with artificial bounds allowed results on
+# the bounds, when there should be.
+
+# If I don't have one already, an example to show boundary estimates with
+# plausible variance estimates, and make sure code reports them but notes that
+# they're illegitimate.  Also one that shows failure to converge.  Write down all
+# my examples.
 
 # Fix confusing error when try to display power plot for lambda for non-lambda
 # models. And non estimated parameters generally?  This has caused long

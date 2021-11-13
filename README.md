@@ -20,7 +20,6 @@ A Shiny web app for capture-recapture model fitting and study design via fast si
     - python folder - Python JAX code for nll and gradient.- Results.dat - Current CaPow.dat file.  I deleted the results from Example project in the one in the app for quickly testing running projects.
   - Saved CaPow objects.dat - Various saved models, simulations, and projects that have useful as examples or experiments.
   - capow.R - Primary code for data simulation and model fitting without using TMB.
-  - CaPow_with_TMB.Rmd and .html - Code testing model fitting with and without TMB when I first implemented it in TMB.  Also explored using the Hessian to diagnose parameter redundancy.
   - maui_dolphin_dataset.csv - A real example dataset that can be uploaded into the app.  I think I was also using this to compare the results of my implementation of simulating from existing data with Rachel's.
 
 
