@@ -4,29 +4,16 @@
 shinyServer(function(input, output, session) {
   # I can maybe source most of this outside server? I just want to load
   # capow.dat inside so that each session gets its own CPenv...
-  source("capow_tmb.R", local = T)
+  source("Code/capow_tmb.R", local = T)
   # source("capow.R", local = T)
   set.seed(1)
   
   # Source server logic for modules
   # What does the local = T do again?
-  source("NavBarApp/ModelServer.R", local = T)
-  source("NavBarApp/FitSummaryServer.R", local = T)
-  source("NavBarApp/FitBuilder/UploadServer.R", local = T)
-  source("NavBarApp/FitBuilder/FitModelServer.R", local = T)
-  source("NavBarApp/FitBuilder/ViewDataServer.R", local = T)
-  source("NavBarApp/FitBuilder/ParameterEstimatesServer.R", local = T)
-  source("NavBarApp/FitBuilder/ModelCompServer.R", local = T)
-  source("NavBarApp/FitBuilder/PopulationEstimatesServer.R", local = T)
-  source("NavBarApp/FitBuilder/ViewPopPlotsServer.R", local = T)
-  source("NavBarApp/SimServer.R", local = T)
-  source("NavBarApp/SummaryServer.R", local = T)
-  source("NavBarApp/ProjectBuilderServer.R", local = T)
-  source("NavBarApp/RunServer.R", local = T)
-  source("NavBarApp/PowerServer.R", local = T)
-  source("NavBarApp/PlotServer.R", local = T)
-  source("NavBarApp/RemoveServer.R", local = T)
-  source("NavBarApp/SaveLoadServer.R", local = T)
+  files.sources = list.files("Code/Servers", recursive = T)
+  for (i in seq_along(files.sources)) {
+    source(paste0("Code/Servers/", files.sources[i]), local = T)
+  }
   
   # Create reactive list of reactive-value lists for objects to pass between modules
   capow_list <- reactive(

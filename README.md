@@ -6,6 +6,8 @@ A Shiny web app for capture-recapture model fitting and study design via fast si
 
 -   In the first version of CaPow the model fitting often gave negative estimates of variances. After implementing it in TMB I realized that the original code was converging to false minima due to tricks used to enforce parameter bounds manually and avoid what turned out to be legitimate boundary estimates.
 
+-   Running precompile after TMB is installed speeds up compilation a lot.
+
 -   I have had a lot of trouble with TMB not compiling or giving random errors when I reinstall, but it seems to be working now.
 
 -   I started writing code to use jax in python to find the nll and do automatic differentiation. I made some progress but I'm not sure I got it working.
@@ -18,25 +20,29 @@ A Shiny web app for capture-recapture model fitting and study design via fast si
 
     -   ui.R - Code specifying GUI for app.
 
-    -   CaPowGUIFuncs.R - Functions creating components for GUI.
-
     -   server.R - Code to run app according to specified GUI.
-
-    -   capow_tmb.R - Primary code for data simulation and model fitting using TMB.
 
     -   popan.cpp - NLL function in C++ template for automatic differentiation with TMB.
 
     -   popan.o and popan.dll - Files created by compilation of popan.cpp by TMB.
 
-    -   CaPow.dat - Saved capow objects loaded when the app is started as examples. I deleted the results from Example project to quickly test running projects.
+    -   Data folder
 
-    -   example_dataset.csv - A simulated example dataset that can be uploaded into the app.
+        -   CaPow.dat - Saved capow objects loaded when the app is started as examples. I deleted the results from Example project to quickly test running projects.
 
-    -   www folder - Presentation and video intro to display on welcome tab.
+        -   example_dataset.csv - A simulated example dataset that can be uploaded into the app.
 
-    -   NavBarApp folder - Module UI and Server files for app.
+    -   www folder - Slides and video intro to display on welcome tab.
 
-        -   WelcomeUI.R
+    -   Code folder
+
+        -   capow_tmb.R - Primary code for data simulation and model fitting using TMB.
+
+        -   CaPowGUIFuncs.R - Functions creating components for GUI.
+
+        -   UIs folder - Files with UIs for all main tabs, and object summary displays.
+
+        -   Servers folder - Files with code to serve all main tabs except Welcome, and object summary displays, according to specified GUIs.
 
 -   Extra folder - Code for testing, future/alternative ideas, and demonstrations.
 

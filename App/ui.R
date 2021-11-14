@@ -11,27 +11,11 @@
 # source("capow_tmb.R")
 
 # Source functions to support UIs
-source("CaPowGUIFuncs.R")
+source("Code/CaPowGUIFuncs.R")
 
 # Source module UIs
-# Might be able to tidy this code like this?
-# setwd("NavBarApp/Modules")
-# files.sources = list.files()
-# sapply(files.sources, source)
-# setwd("../..")
-source("NavBarApp/WelcomeUI.R")
-source("NavBarApp/ModelUI.R")
-source("NavBarApp/FitSummaryUI.R")
-source("NavBarApp/FitBuilder/FitBuilderUI.R")
-source("NavBarApp/SimUI.R")
-source("NavBarApp/SummaryUI.R")
-source("NavBarApp/ProjectBuilderUI.R")
-source("NavBarApp/RunUI.R")
-source("NavBarApp/ProjectsUI.R")
-source("NavBarApp/PowerUI.R")
-source("NavBarApp/PlotUI.R")
-source("NavBarApp/RemoveUI.R")
-source("NavBarApp/SaveLoadUI.R")
+files.sources = list.files("Code/UIs")
+sapply(paste0("Code/UIs/", files.sources), source)
 
 # Define combined UI as navbarPage with module UI's for tabs
 shinyUI(

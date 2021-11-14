@@ -16,12 +16,11 @@ library(TMB)
 
 # Trying to get CPenv into session environment, so maybe easier outside of function
 # CPinit()
-load("CaPow.dat")
+load("Data/CaPow.dat")
 # CPenv <- new.env()
 # assign("ModelList", list(), envir = CPenv)
 # assign("SimList", list(), envir = CPenv)
 # assign("ProjectList", list(), envir = CPenv)
-
 
 compile("popan.cpp")
 dyn.load(dynlib("popan"))
