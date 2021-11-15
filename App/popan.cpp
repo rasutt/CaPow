@@ -1,6 +1,4 @@
-// POPAN negative log-likelihood function for TMB. Rewritten from capow-fast.R,
-// capow with Robin's modifications for speed, with original comments and
-// structure where possible.
+// POPAN negative log-likelihood function for TMB
 
 #include <TMB.hpp>
 
@@ -69,16 +67,14 @@ Type objective_function<Type>::operator() ()
     pentvec.setZero();
     pentvec(0) = 1;
     Type cumlambda = 1;
-    
-    for(int t = 1; t < k; t++) {
-      pentvec(t) = (pow(lambda, gapvec(t - 1)) - pow(phival, gapvec(t - 1))) * 
+    for(int i = 1; i < k; i++) {
+      pentvec(i) = (pow(lambda, gapvec(i - 1)) - pow(phival, gapvec(i - 1))) * 
         cumlambda;
-      cumlambda *= pow(lambda, gapvec(t - 1));
+      cumlambda *= pow(lambda, gapvec(i - 1));
     }
-
-    Type sumpentvec = pentvec.sum();
+    Type pentvecsum = pentvec.sum();
     for(int i = 0; i < k; i++) {
-      pentvec(i) = pentvec(i) / sumpentvec;
+      pentvec(i) = pentvec(i) / pentvecsum;
     }
     
   // For non-lambda models, we need to calculate one of the pent values as 1 -
@@ -97,10 +93,8 @@ Type objective_function<Type>::operator() ()
   vector<Type> chivec(k);
   chivec(k - 1) = 1;
   vector<Type> psurvivegap(k - 1);
-  int phiminindex = gapvec.sum();
   for(int i = k - 2; i >= 0; i--) {
-    phiminindex = phiminindex - gapvec(i);
-    psurvivegap(i) = pow(allvalues(phiinds(phiminindex)), gapvec(i));
+    psurvivegap(i) = pow(allvalues(phiinds(gapvec.head(i).sum())), gapvec(i));
     chivec(i) = Type(1.0) - psurvivegap(i) + psurvivegap(i) * 
       (Type(1.0) - pvec(i + 1)) * chivec(i + 1);
   }
