@@ -43,37 +43,24 @@ Type objective_function<Type>::operator() ()
     allvalues(indsinsertintoallvalues(i)) = pars(whichparsintoallvalues(i));
   }
 
-  // Pull out population size and capture probabilities
+  // Super-population size, capture probabilities and their complements, and
+  // entry proportions (filled in later)
   Type N = allvalues(Nind);
-  vector<Type> pvec(k);
+  vector<Type> pvec(k), pcompvec(k), pentvec(k);
   for(int i = 0; i < k; i++) {
     pvec(i) = allvalues(pinds(i));
+    pcompvec(i) = Type(1.0) - pvec(i);
   }
 
-  // Find the number of phi parameters.  There are only k - 1 possible distinct
-  // parameters in the model, but the values are repeated over years between
-  // surveys.
-  int philen = phiinds.size();
-  
-  // Pull out survival probabilities
-  vector<Type> phivec(philen);
-  for(int i = 0; i < philen; i++) {
-    phivec(i) = allvalues(phiinds(i));
-  }
-  
-  // Create variables for entry proportions and population growth rate
-  vector<Type> pentvec(k);
-  Type lambda = 0;
-  
   // If it's a lambda-model, we need to calculate all the pent values as a
   // function of lambda and phi.
   if(lambdamodel == 1) {
     // Get survival probability, it's constrained to be equal over all surveys
     // for lambda-models
-    Type phival = phivec(0);
+    Type phival = allvalues(phiinds(0));
 
     // Get population growth rate
-    lambda = allvalues(lambdaind);
+    Type lambda = allvalues(lambdaind);
 
     // Find entry proportions for each survey. k > 1 is required for all models.
     // The proportion entering is the proportion of population growth minus the
@@ -103,82 +90,48 @@ Type objective_function<Type>::operator() ()
     pentvec(calcind) = 1 - pentvec.sum();
   }
 
-  // ## --------------------------------------------------------------------
-  // ## Capture history calculations begin here:
-  // ## --------------------------------------------------------------------
-  //
-  // ## Find the chi parameters.  chivec[t] = P(never seen after occasion t | alive at t).
-  // ## Simultaneously with chivec, create a vector of length k-1 called psurvive.gap, such that
-  // ## psurvive.gap[i] = P(survive from survey i to survey i+1 | alive at survey i)
-  // ## and it is the product of phivec probabilities spanning the calendar years from survey i to survey i+1.
+  // Find the chi parameters, P(never seen after occasion i | alive at i), from
+  // recurrence relation starting with one for i = k, and P(survive from survey
+  // i to survey i + 1 | alive at survey i).  The phi values are repeated over
+  // years between surveys.
   vector<Type> chivec(k);
   chivec(k - 1) = 1;
   vector<Type> psurvivegap(k - 1);
-  int phiminindex = philen;
-  int newphiminindex;
+  int phiminindex = gapvec.sum();
   for(int i = k - 2; i >= 0; i--) {
-    // ## phivec.i contains the survival probabilities from survey i to survey i+1:
-    // ## we need to go back gapvec[i] places from the previous position (phi.min.index)
-    // ## and take all elements of phi starting there and ending at phi.min.index-1:
-    // ## then redefine phi.min.index for the next loop.
-    newphiminindex = phiminindex - gapvec(i);
-    // phivec.i = phivec[new.phi.min.index : (phi.min.index-1)]
-    // ## psurvive.gap[i] is the probability of surviving the interval from survey i to survey i+1.
-    // psurvive.gap[i] = prod(phivec.i)
-    psurvivegap(i) = Type(1.0);
-    for(int j = newphiminindex; j < phiminindex; j++) {
-      psurvivegap(i) *= phivec(j);
-    }
-    chivec(i) = Type(1.0) - psurvivegap(i) + psurvivegap(i) * (Type(1.0) - pvec(i + 1)) * chivec(i + 1);
-    phiminindex = newphiminindex;
+    phiminindex = phiminindex - gapvec(i);
+    psurvivegap(i) = pow(allvalues(phiinds(phiminindex)), gapvec(i));
+    chivec(i) = Type(1.0) - psurvivegap(i) + psurvivegap(i) * 
+      (Type(1.0) - pvec(i + 1)) * chivec(i + 1);
   }
-  vector<Type> logpsurvivegap = log(psurvivegap);
-  
-  // Find E(Nt) and specify it as a derived parameter to calculate and report the standard error
+
+  // Find the psi parameters, P(never seen before occasion i, and alive at i)
+  // and E(N_t), from recurrence relations starting with entry proportion for i
+  // = 1, and superpopulation size.
+  vector<Type> psivec(k);
+  psivec(0) = pentvec(0);
   vector<Type> exp_n_alive(k);
   exp_n_alive(0) = N * pentvec(0);
   for(int i = 1; i < k; i++) {
+    psivec(i) = psivec(i - 1) * (1 - pvec(i - 1)) * psurvivegap(i - 1) + 
+      pentvec(i);
     exp_n_alive(i) = exp_n_alive(i - 1) * psurvivegap(i - 1) + N * pentvec(i);
   }
+
+  // Specify E(N_t) as a derived parameter for TMB to calculate and report the
+  // standard error
   ADREPORT(exp_n_alive);
-
-  // ## ** Start of Robin's additions here **
-  // ## Find the probability up to the first capture in a history with:
-  // ## prob.to.f.m.1[1] = pentvec[1]
-  // ## prob.to.f.m.1[t+1] = prob.to.f.m.1[t] * (1 - pvec[t]) * psurvive.gap[t] + pentvec[t+1]
-  // ## The log of this vector can then be multiplied by the first.tab vector found above and subtracted
-  // ## from the negative log-likelihood.
-  vector<Type> probtofm1(k);
-  probtofm1(0) = pentvec(0);
-  for(int i = 1; i < k; i++) {
-    probtofm1(i) = probtofm1(i - 1) * (1 - pvec(i - 1)) * psurvivegap(i - 1) + pentvec(i);
-  }
-  // ## ** End of Robin's additions here **
-
-  // ## First create the Binomial portion of the likelihood, and account for all animals never seen.
-  // ## p.unseen = pent1 (1-p1) chi_1 + pent2 (1-p2) chi_2 + ... + pent.k (1-pk) chi_k
-  vector<Type> pveccomp(k);
-  for(int i = 0; i < k; i++) {
-    pveccomp(i) = Type(1.0) - pvec(i);
-  }
-
-  Type logpunseen = log((pentvec * pveccomp * chivec).sum());
-  // ## The N-nhist animals never seen give likelihood contribution proportional to
-  // ## N! / (N-nhist)! p.unseen^(N-nhist)
-  // ## so the analytic continuation of the negative log likelihood contribution is
-  // ## -lgamma(N+1) + lgamma(N-nhist+1) - (N-nhist) log(p.unseen):
-  Type nllike = -lgamma(N + Type(1.0)) + lgamma(N - nhist + Type(1.0)) - (N - nhist) * logpunseen;
-
-  // ## Now for the animals that were seen.
-  // ## ** Start of Robin's code replacing section commented out in original **
-  // ## With the additions above we can now complete the negative log-likelihood calculations in one step.
-  nllike = nllike -
-    (firsttab * log(probtofm1)).sum() -
+  
+  // Negative log likelihood, composed of analytic continuation of number of
+  // ways of dividing superpopulation into never captured, and captured at least
+  // once, and capture history probabilities in each case.
+  Type nllike = -lgamma(N + Type(1.0)) + lgamma(N - nhist + Type(1.0)) - 
+    (N - nhist) * log((pentvec * pcompvec * chivec).sum()) -
+    (firsttab * log(psivec)).sum() -
     (lasttab * log(chivec)).sum() -
     (caps * log(pvec)).sum() -
-    (noncaps * log(pveccomp)).sum() -
-    (survives * logpsurvivegap).sum();
-  // ## ** End of Robin's code replacing section commented out in original **
-
+    (noncaps * log(pcompvec)).sum() -
+    (survives * log(psurvivegap)).sum();
+  
   return nllike;
 }
