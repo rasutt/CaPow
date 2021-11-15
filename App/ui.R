@@ -5,14 +5,14 @@
 # else.
 # source("capow_tmb.R")
 
-# Source functions to support UIs
+# Load functions to support UIs
 source("Code/CaPowGUIFuncs.R")
 
-# Source module UIs
+# Load component UIs
 files.sources = list.files("Code/UIs")
 sapply(paste0("Code/UIs/", files.sources), source)
 
-# Define combined UI as navbarPage with module UI's for tabs
+# Define combined UI as navbarPage with component UIs for tabs
 shinyUI(
   navbarPage(
     title = "CaPow!",

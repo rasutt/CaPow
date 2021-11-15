@@ -6,22 +6,12 @@
 # I have modified popan.func to calculate some extra pieces, build the automatically differentiable function with them,
 # and use it to find the MLEs.
 
-library(shiny)
+# Load packages and initial objects for app 
 library(naturalsort)
 library(TMB)
-
-# Trying to source in ui.R so I can source this file in server.R
-# source("CaPowGUIFuncs.R")
-# source("CaPowGUI.R", local = T)
-
-# Trying to get CPenv into session environment, so maybe easier outside of function
-# CPinit()
 load("Data/CaPow.dat")
-# CPenv <- new.env()
-# assign("ModelList", list(), envir = CPenv)
-# assign("SimList", list(), envir = CPenv)
-# assign("ProjectList", list(), envir = CPenv)
 
+# Compile and load popan negative log-likelihood function with TMB
 compile("popan.cpp")
 dyn.load(dynlib("popan"))
 

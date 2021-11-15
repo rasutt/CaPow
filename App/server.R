@@ -1,6 +1,4 @@
 # Server logic for CaPow web app
-
-# Overall server logic
 shinyServer(function(input, output, session) {
   # Load main functions for app
   source("Code/capow_tmb.R", local = T)
