@@ -1,12 +1,14 @@
 ### CaPow!
 
-A Shiny web app for capture-recapture model fitting and study design via fast simulation and optimization using automatic differentiation.
+A Shiny web app for open population capture-recapture model fitting and study design via fast simulation and optimization using automatic differentiation.
 
 #### General notes
 
 -   In the first version of CaPow the model fitting often gave negative estimates of variances. After implementing it in TMB I realized that the original code was converging to false minima due to tricks used to enforce parameter bounds manually and avoid what turned out to be legitimate boundary estimates.
 
--   Running precompile after TMB is installed speeds up compilation a lot.
+-   Running precompile after TMB is installed speeds up compilation a lot. Should only do once as it takes a long time though it doesn't actually happen till the next time you compile a function. Doesn't matter for users because they only compile the function once.
+
+-   You may have to restart R if you recompile the objective function. Either windows or precompilation seems to have fixed this, but there is also a fix for linux on the TMB install github page.
 
 -   I have had a lot of trouble with TMB not compiling or giving random errors when I reinstall, but it seems to be working now.
 

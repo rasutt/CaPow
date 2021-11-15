@@ -2710,14 +2710,14 @@ popan.func <- function(det.dat, setup.res, printit=T){
         lambdamodel <- setup.res$lambdamodel  ## True or False
 
         ## ------------------------------------------------------------------------------------------------------------------
-        ## Create vectors to used inside the likelihood for slotting parameter values into the right places:
+        ## Create vectors to be used inside the likelihood for slotting parameter values into the right places:
         ## ------------------------------------------------------------------------------------------------------------------
         ## which.pars.into.allvalues.tmp has the same length as allparvec, but contains the *index* of the pars.estvec
         ## value that should be slotted into the corresponding position in allvalues, or NA if there isn't any such
         ## parameter.
         ## For example, if allparvec is:
-        ## N lambda   phi1     phi2    phi3      p1       p2      p4    pent1  pent2  pent4
-        ## "N"  "1.1" "phi1" "phi1" "phi1"   "p1"   "p2"   "p4"  "calc"  "calc"  "calc"
+        ## N    lambda   phi1     phi2    phi3     p1     p2     p4    pent1   pent2   pent4
+        ## "N"  "1.1"    "phi1"   "phi1"  "phi1"   "p1"   "p2"   "p4"  "calc"  "calc"  "calc"
         ## then
         ## pars.estvec = c("N", "phi1", "p1", "p2", "p4")
         ## and
@@ -2897,7 +2897,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
           control = list(parscale = param.scale)
         )
         
-        # print(mle.res)
+        print(mle.res)
         
         # Get estimated expected numbers alive and standard errors from TMB
         exp_n_alive <- tail(summary(sdreport(obj)), k)

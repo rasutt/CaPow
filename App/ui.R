@@ -1,9 +1,4 @@
-# UI for combined CaPow app
-
-# NOTE - Restart R when running a test version of the app from a different
-# directory for the first time.  Avoids TMB giving crazy errors, and failing
-# to produce MLEs: 
-# Error in f(x, order = 2) : Atomic 'D_lgamma' order not implemented.
+# UI for CaPow web app
 
 # Initialize app environment.  This is now done in server for each session, but
 # it should come back when I have time to disentangle CPenv from everything

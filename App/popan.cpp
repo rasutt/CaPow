@@ -1,5 +1,6 @@
-// POPAN negative log-likelihood function for TMB
-// Rewritten from capow-fast.R, capow with Robin's modifications for speed, with original comments and structure where possible.
+// POPAN negative log-likelihood function for TMB. Rewritten from capow-fast.R,
+// capow with Robin's modifications for speed, with original comments and
+// structure where possible.
 
 #include <TMB.hpp>
 
@@ -22,134 +23,87 @@ Type objective_function<Type>::operator() ()
   DATA_IVECTOR(pentinds);
   DATA_IVECTOR(pinds);
   DATA_INTEGER(Nind);
-  DATA_INTEGER(lambdaind); // index of lambda for lambda model, zero otherwise
-  DATA_INTEGER(calcind); // index of one calc pent value for pent model, zero otherwise
+  // index of lambda for lambda model, zero otherwise
+  DATA_INTEGER(lambdaind); 
+  // index of one calc pent value for pent model, zero otherwise
+  DATA_INTEGER(calcind); 
   
   PARAMETER_VECTOR(pars);
   
-  // // ## Using the vector pars, place all values into their appropriate slots.
-  // ## For example, if allparvec is:
-  // ## N lambda   phi1     phi2    phi3      p1       p2      p4    pent1  pent2  pent4
-  // ## "N"  "1.1" "phi1" "phi1" "phi1"   "p1"   "p2"   "p4"  "calc"  "calc"  "calc"
-  // ## then
-  // ## pars.estvec = c("N", "phi1", "p1", "p2", "p4")
-  // ## and pars is the same length as pars.estvec, but contains numbers for each of the parameter values.
-  // ##
-  // ## allvalues has the same length and names as allparvec, and contains the correct values for each
-  // ## parameter slot.  Use the vectors which.pars.into.allvalues and inds.insert.into.allvalues created above
-  // ## to put the parameter values in the right places.
-  // ##
-  // ## First set allvalues to constvalues: this will establish any constant values and have 0s everywhere
-  // ## else.  The reason for using constvalues instead of allparvec is that constvalues is a numeric
-  // ## vector whereas allparvec is a character vector.
+  // The parameters to be optimized come in as pars.  The others come in as
+  // constvalues, which has zeros where values from pars should go.  
+  
+  // Make vector for all parameter values, and fill in those held constant.
   vector<Type> allvalues = constvalues;
-  // ## Replace any parameter slots with parameters-to-be-estimated in allvalues with their current
-  // ## values from pars:
+  
+  // Fill in the values to be estimated.  We need their indices in pars because
+  // the same parameters may be used multiple times when they're constrained to
+  // be equal in the model.
   for(int i = 0; i < indsinsertintoallvalues.size(); i++) {
     allvalues(indsinsertintoallvalues(i)) = pars(whichparsintoallvalues(i));
   }
 
-  // The code below is replaced by the code further down by skipping the step of putting it into replace.calc.func.
-  // // ## Replace any parameter slots that are derived from other parameters with their derived values from
-  // // ## pars:
-  // // ## the function replace.calc.func is defined before this function, and is defined differently for
-  // // ## lambda-models and for other models.
-  // // ## For lambda-models, it assumes (after checks already completed in popan.setup.func) that all
-  // // ## pent parameters are "calc".  For other models, it detects which single one of the pent parameters
-  // // ## is to be calculated as 1 - sum-of-the-others.
-  // // ## The "calc" entries in allparvec are only used for detecting which of the pent parameters to
-  // // ## replace in non-lambda models: they aren't used directly for lambda models.
-  // allvalues = replace.calc.func(allvalues)
-  // names(allvalues) = names(allparvec)
-  //
-  // // ## Extract N, phivec, pvec, and pentvec from allvalues:
-  // N = allvalues["N"]
+  // Pull out population size and capture probabilities
   Type N = allvalues(Nind);
-  // phivec = allvalues[phinames]
-  // The length of phivec is not k - 1 but the number of years between the first and last surveys.
-  // All of those between each survey are modelled by one parameter in allvalues.
-  int phisize = phiinds.size();
-  vector<Type> phivec(phisize);
-  for(int i = 0; i < phisize; i++) {
-    phivec(i) = allvalues(phiinds(i));
-  }
-  // pvec = allvalues[pnames]
   vector<Type> pvec(k);
   for(int i = 0; i < k; i++) {
     pvec(i) = allvalues(pinds(i));
   }
-  // pentvec = allvalues[pentnames]
-  //
-  // // ## ------------------------------------------------------------------------------------------------------------------
-  // // ## Create the code needed to fill in "calc" values with derived functions of other parameters
-  // // ## ------------------------------------------------------------------------------------------------------------------
-  // // ## Here we create a function "replace.calc.func" that will be called from the likelihood function
-  // // ## to fill in any values in allparvec that are marked "calculated" and need to be replaced by derived
-  // // ## values of other parameters.
-  // // ## There are two cases for replace.calc.func:
-  // // ## 1. For lambda-models, we need code to calculate all the pent values as a function of lambda and phi.
-  // // ## 2. For other models, we need code to calculate one of the pent values as 1 - sum (other pents).
-  //
+
+  // Find the number of phi parameters.  There are only k - 1 possible distinct
+  // parameters in the model, but the values are repeated over years between
+  // surveys.
+  int philen = phiinds.size();
+  
+  // Pull out survival probabilities
+  vector<Type> phivec(philen);
+  for(int i = 0; i < philen; i++) {
+    phivec(i) = allvalues(phiinds(i));
+  }
+  
+  // Create variables for entry proportions and population growth rate
   vector<Type> pentvec(k);
   Type lambda = 0;
+  
+  // If it's a lambda-model, we need to calculate all the pent values as a
+  // function of lambda and phi.
   if(lambdamodel == 1) {
-  //   // ## Lambda models: calculate pents as a function of lambda and phi.
-  //   // ## popan.setup.func already checked that for a lambda model, all the pent parameters are "calc".
-  //   // replace.calc.func = function(allvals){
-  //     // ## We've already checked in popan.setup.func that the model specifies a single value of phi.
-  //     // ## Use allvals[phinames][1] to extract what it is.
+    // Get survival probability, it's constrained to be equal over all surveys
+    // for lambda-models
     Type phival = phivec(0);
-  //     // ## Extract lambda:
+
+    // Get population growth rate
     lambda = allvalues(lambdaind);
-  //
-  //     // ## Create the pent vector: note that k, gapvec, and cumvec are all globally defined.
+
+    // Find entry proportions for each survey. k > 1 is required for all models.
+    // The proportion entering is the proportion of population growth minus the
+    // proportion surviving, weighted by the relative sizes of the population
+    // over time.
     pentvec.setZero();
     pentvec(0) = 1;
-  //     // ## We have already checked that k>=2.
-  //
-  //     // ## ** Start of Robin's code replacing section below **
-  //     // ## This seems to be faster because it doesn't use a loop.
-  //       phivec = phival^gapvec
-  //       lambda = lambdaval^gapvec
-  //       pentvec[2:k] = (lambda - phivec) * cumprod(c(1, lambda[1:(k-2)]))
-  //     // ## ** End of Robin's code replacing section below **
     Type cumlambda = 1;
+    
     for(int t = 1; t < k; t++) {
-      pentvec(t) = (pow(lambda, gapvec(t - 1)) - pow(phival, gapvec(t - 1))) * cumlambda;
+      pentvec(t) = (pow(lambda, gapvec(t - 1)) - pow(phival, gapvec(t - 1))) * 
+        cumlambda;
       cumlambda *= pow(lambda, gapvec(t - 1));
     }
-  //     // # for(t in 2:k){
-  //     // #         pentvec[t] =
-  //     // #                 (lambdaval - phival) * sum(phival^(0 : (gapvec[t-1]-1)) *
-  //     // #                                                    lambdaval^((cumvec[t]-1):cumvec[t-1]))
-  //     // # }
+
     Type sumpentvec = pentvec.sum();
     for(int i = 0; i < k; i++) {
       pentvec(i) = pentvec(i) / sumpentvec;
     }
-  //         // ## Now insert the pentvec back into allvals:
-  //         allvals[pentnames] = pentvec
-  //           return(allvals)
-  //   }
-  //   // ## ------end of replace.calc.func for lambda-models-------
+    
+  // For non-lambda models, we need to calculate one of the pent values as 1 -
+  // sum(other pents).
   } else {
-  //   // ## Non-lambda models: exactly one of the pents should be "calc".
-  //   // ## Even if all pents are supplied as numbers, it is easier to leave one as "calc" and apply
-  //   // ## this function anyway instead of adding an extra "if" check.
-  //   // ## popan.setup.func already checked that which.calc has length exactly 1.
-  //   which.calc = which(allparvec[pentnames]=="calc")
-  //   replace.calc.func = function(allvals){
-  //     allvals[pentnames][which.calc] = 1 - sum(allvals[pentnames][-which.calc])
-  //     return(allvals)
-  //   }
     for(int i = 0; i < k; i++) {
       pentvec(i) = allvalues(pentinds(i));
     }
     pentvec(calcind) = 1 - pentvec.sum();
-  //   // ## ------end of replace.calc.func for non-lambda models-------
   }
 
-  // // ## --------------------------------------------------------------------
+  // ## --------------------------------------------------------------------
   // ## Capture history calculations begin here:
   // ## --------------------------------------------------------------------
   //
@@ -160,7 +114,7 @@ Type objective_function<Type>::operator() ()
   vector<Type> chivec(k);
   chivec(k - 1) = 1;
   vector<Type> psurvivegap(k - 1);
-  int phiminindex = phisize;
+  int phiminindex = philen;
   int newphiminindex;
   for(int i = k - 2; i >= 0; i--) {
     // ## phivec.i contains the survival probabilities from survey i to survey i+1:

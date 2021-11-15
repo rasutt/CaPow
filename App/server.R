@@ -1,21 +1,22 @@
-# Server logic for combined CaPow app.
+# Server logic for CaPow web app
 
 # Overall server logic
 shinyServer(function(input, output, session) {
-  # I can maybe source most of this outside server? I just want to load
-  # capow.dat inside so that each session gets its own CPenv...
+  # Load main functions for app
   source("Code/capow_tmb.R", local = T)
   # source("capow.R", local = T)
   set.seed(1)
   
-  # Source server logic for modules
-  # What does the local = T do again?
+  # Load server logic for UIs.  local = T evaluates the expressions within
+  # this environment, rather than the global one, which this one can't seem to
+  # see
   files.sources = list.files("Code/Servers", recursive = T)
   for (i in seq_along(files.sources)) {
     source(paste0("Code/Servers/", files.sources[i]), local = T)
   }
   
-  # Create reactive list of reactive-value lists for objects to pass between modules
+  # Create reactive list of reactive-value lists for objects to pass between
+  # modules
   capow_list <- reactive(
     list(
       sim_list = reactiveVal(get0("SimList", envir = CPenv)),

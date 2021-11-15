@@ -2,10 +2,6 @@
 
 # *** First priority ***
 
-# Tidy up module files and write explanation.
-
-# Tidy up code to load module UIs.
-
 # If I don't have one already, make an example to show boundary estimates with
 # plausible variance estimates, and make sure code reports them but notes that
 # they're illegitimate.  Also one that shows failure to converge.  Write down all
