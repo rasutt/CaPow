@@ -2845,14 +2845,15 @@ popan.func <- function(det.dat, setup.res, printit=T){
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find std errors using TMB:
         ## ------------------------------------------------------------------------------------------------------------------
-        var.vec <- head(summary(sdreport(obj))[, 2], npar)^2
+        sds <- summary(sdreport(obj))
+        var.vec <- head(sds[, 2], npar)^2
         names(var.vec) <- paste("var", pars.estvec, sep=".")
 
         # If estimating lambda get variance from TMB separately because actually
         # estimates rho = lambda - phi.  Can't just add their variances as the
         # estimates are correlated.
         if (lambda.est) {
-          var.vec[lambda.par.ind] <- summary(sdreport(obj))[npar + 1, 2]^2
+          var.vec[lambda.par.ind] <- sds[npar + 1, 2]^2
         }
         
         ## ------------------------------------------------------------------------------------------------------------------
@@ -2864,8 +2865,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         all.res <- c(mle.params, var.vec, min.nll = min.negloglike, npar = npar,
                      AIC = AIC, AICc = AICc, code = mle.res$convergence == 0, 
                      flag = is.nan(mle.res$objective), 
-                     iter = mle.res$iterations, 
-                     exp_n_alive = tail(summary(sdreport(obj)), k))
+                     iter = mle.res$iterations, exp_n_alive = tail(sds, k))
         attributes(all.res)$allparvec <- allparvec
         # print(all.res)
         all.res
