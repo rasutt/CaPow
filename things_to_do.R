@@ -2,6 +2,8 @@
 
 # *** First priority ***
 
+# Maybe add a brief description of how the code works altogether in the readme.
+
 # If I don't have one already, make an example to show boundary estimates with
 # plausible variance estimates, and make sure code reports them but notes that
 # they're illegitimate.  Also one that shows failure to converge.  Write down all

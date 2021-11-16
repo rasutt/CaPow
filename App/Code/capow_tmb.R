@@ -2860,7 +2860,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         ## Compile results for returning:
         ## ------------------------------------------------------------------------------------------------------------------
         
-        # Flag represents boundary estimates which might cause C++ floating
+        # Flag can represent boundary estimates which might cause C++ floating
         # point exceptions, which TMB converts to NaNs.
         all.res <- c(mle.params, var.vec, min.nll = min.negloglike, npar = npar,
                      AIC = AIC, AICc = AICc, code = mle.res$convergence == 0, 
