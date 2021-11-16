@@ -2685,16 +2685,9 @@ popan.func <- function(det.dat, setup.res, printit=T){
         if(k < 2) stop("negloglike.func assumes k >= 2.")
         
         nhist <- nrow(det.dat)
-        gapvec <- setup.res$gapvec
-        cumvec <- setup.res$cumvec
         allparvec <- setup.res$allparvec
         pars.estvec <- setup.res$pars.estvec
-        constvalues <- setup.res$constvalues
         startvals <- setup.res$startvals
-        phinames <- setup.res$phinames
-        pnames <- setup.res$pnames
-        pentnames <- setup.res$pentnames
-        lambdamodel <- setup.res$lambdamodel  ## True or False
 
         ## ------------------------------------------------------------------------------------------------------------------
         ## Create vectors to be used inside the likelihood for slotting parameter values into the right places:
@@ -2715,7 +2708,6 @@ popan.func <- function(det.dat, setup.res, printit=T){
         ##
         ## Finally, which.pars.into.allvalues is the shortened version which only includes the non-NAs:
         ## which.pars.into.allvalues = c(1, 2, 2, 2, 3, 4, 5)
-        
         which.pars.into.allvalues.tmp <- match(allparvec, pars.estvec)
         inds.insert.into.allvalues <- which(!is.na(which.pars.into.allvalues.tmp))
         which.pars.into.allvalues <- which.pars.into.allvalues.tmp[inds.insert.into.allvalues]
@@ -2740,202 +2732,144 @@ popan.func <- function(det.dat, setup.res, printit=T){
         caps <- colSums(det.dat)
         non.caps.mat <- matrix(0, nrow = nhist, ncol = k)
         survive.mat <- matrix(0, nrow = nhist, ncol = k)
-        
         first.obs <- last.obs <- numeric(nhist)
         for(elt in 1:nhist){
-                which.1 <- which(det.dat[elt,]==1)
-                first <- min(which.1)
-                last <- max(which.1)
-                first.obs[elt] <- first
-                last.obs[elt] <- last
-                
-                if(last > first){
-                        non.caps.mat[elt, first:last] <- 1 - det.dat[elt, first:last]
-                        survive.mat[elt, first:(last-1)] <- 1
-                }
-                
+          which.1 <- which(det.dat[elt,]==1)
+          first <- min(which.1)
+          last <- max(which.1)
+          first.obs[elt] <- first
+          last.obs[elt] <- last
+          if(last > first){
+            non.caps.mat[elt, first:last] <- 1 - det.dat[elt, first:last]
+            survive.mat[elt, first:(last-1)] <- 1
+          }
         }
         non.caps <- colSums(non.caps.mat)
         first.tab <- table(factor(first.obs, levels=1:k))
         last.tab <- table(factor(last.obs, levels=1:k))
         survives <- colSums(survive.mat)[1:(k-1)]
 
-        # Indices of parameters in allparvec starting from zero for the TMB C++ function
+        # Indices of parameters in allparvec starting from zero for the TMB C++
+        # function
         allparnames <- names(allparvec)
-        phiinds <- match(phinames, allparnames) - 1
-        pentinds <- match(pentnames, allparnames) - 1
-        pinds <- match(pnames, allparnames) - 1
-        Nind <- grep("N", allparnames) - 1
         lambdaind <- grep("lambda", allparnames) - 1
         if(length(lambdaind) == 0) lambdaind = 0
+        pentinds <- match(setup.res$pentnames, allparnames) - 1
         calcind <- grep("calc", allparvec[pentinds + 1]) - 1
-        # If multiple pents are calc we calculate them all so set calcind to zero so can import as integer either way
+        
+        # If multiple pents are calc we calculate them all so set calcind to
+        # zero so can import as integer either way
         if(length(calcind) > 1) calcind = 0
         
-        # If I was using rho I'd add a tag when lambda was being estimated here
+        # Check if lambda being estimated so can reparameterize as rho = lambda
+        # - phi >= 0 in TMB function
         lambda.par.ind <- match("lambda", pars.estvec)
-        lambda.est <- as.numeric(!is.na(lambda.par.ind))
+        lambda.est <- !is.na(lambda.par.ind)
         
-        # Create data and parameters lists and pass to TMB to create automatically differentiated negative log likelihood function
-        data <- list(k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
-                     firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
-                     constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
-                     whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
-                     pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind, lambdaest = lambda.est)
-        
-        # print(data)
-        
+        # Create data and parameters lists and pass to TMB to create
+        # automatically differentiated negative log likelihood function
+        data <- list(
+          k = k, lambdamodel = as.numeric(setup.res$lambdamodel), 
+          gapvec = setup.res$gapvec, nhist = nhist, firsttab = first.tab, 
+          lasttab = last.tab, caps = caps, noncaps = non.caps, 
+          survives = survives, constvalues = setup.res$constvalues, 
+          indsinsertintoallvalues = inds.insert.into.allvalues - 1,
+          whichparsintoallvalues = which.pars.into.allvalues - 1, 
+          phiinds = match(setup.res$phinames, allparnames) - 1, 
+          pentinds = pentinds, pinds = match(setup.res$pnames, allparnames) - 1, 
+          Nind = grep("N", allparnames) - 1, lambdaind = lambdaind, 
+          calcind = calcind, lambdaest = as.numeric(lambda.est)
+        )
+
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find the MLEs:
         ## ------------------------------------------------------------------------------------------------------------------
-        
-        # nlminb and constrOptim seem to perform similarly well.  nlminb would
-        # require me to reparameterise the objective function to enforce phi <
-        # lambda.  Shouldn't be too hard.
-        
         # Set bounds and parameter scale.  Most parameters are usually
-        # probabilities.
+        # probabilities, update others next.
         npar <- length(startvals)
         upper.bounds <- rep(1, npar)
         lower.bounds <- rep(0, npar)
         param.scale <- rep(1, npar)
         
-        # If N is estimated set its bounds differently.
+        # If N is estimated set its bounds and parameter scale differently.
         N.par.ind <- match("N", pars.estvec)
         if (!is.na(N.par.ind)) {
-                upper.bounds[N.par.ind] <- Inf
-                # upper.bounds[N.par.ind] <- 2 * startvals[N.par.ind]
-                lower.bounds[N.par.ind] <- nhist
-                param.scale[N.par.ind] <- startvals[N.par.ind]
+          upper.bounds[N.par.ind] <- Inf
+          lower.bounds[N.par.ind] <- nhist
+          param.scale[N.par.ind] <- startvals[N.par.ind]
         }
         
-        # If lambda is estimated set its upper bound differently.
+        # If lambda is estimated set its upper bound and parameter scale
+        # differently. The starting value and parameter scale to that for rho =
+        # lambda - phi, which is what will be optimized in TMB
         phi.ind <- grep("phi", pars.estvec)
         if (!is.na(lambda.par.ind)) {
-                upper.bounds[lambda.par.ind] <- Inf
-                # If I changed to estimating rho I'd set a different starting value here
-                startvals[lambda.par.ind] <- startvals[lambda.par.ind] - startvals[phi.ind]
-                param.scale[lambda.par.ind] <- startvals[lambda.par.ind]
+          upper.bounds[lambda.par.ind] <- Inf
+          startvals[lambda.par.ind] <- startvals[lambda.par.ind] - 
+            startvals[phi.ind]
+          param.scale[lambda.par.ind] <- startvals[lambda.par.ind]
         }
-        
-        # nlminb version
-        # mle.res <- nlminb(start = obj$par, objective = obj$fn, 
-        #                   gradient = obj$gr, hessian = obj$he,
-        #                   control = list(iter.max = 500, eval.max = 500),
-        #                   scale = param.scale, ## try this sometime
-        #                   lower = lower.bounds, upper = upper.bounds)
-        
-        # constrOptim version
-        # Combine constraints into matrix and vector such that M.p - v >= 0
-        constraint.mat <- rbind(diag(npar), -diag(npar))
-        constraint.vec <- c(lower.bounds, -upper.bounds)
 
-        # Can't have Inf as a constraint with constrOptim.  Error very opaque!!!
-        finite.constraint.inds <- is.finite(constraint.vec)
-        constraint.mat <- constraint.mat[finite.constraint.inds, ]
-        constraint.vec <- constraint.vec[finite.constraint.inds]
+        # Make automatically differentiated negative log-likelihood function
+        # with TMB
+        obj <- MakeADFun(data, list(pars = startvals), DLL = "popan", 
+                         silent = T)
 
-        # print("list(theta = obj$par,
-        #            ui = constraint.mat,
-        #            ci = constraint.vec,
-        #            control = list(parscale = param.scale))")
-        # print(list(theta = obj$par,
-        #            ui = constraint.mat,
-        #            ci = constraint.vec,
-        #            control = list(parscale = param.scale)))
-        
-        parameters <- list(pars = startvals)
-        obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
-        
-        # Call optimiser
-        mle.res <- constrOptim(
-          theta = obj$par,
-          f = obj$fn,
-          grad = obj$gr,
-          ui = constraint.mat,
-          ci = constraint.vec
-          # ,
-          # control = list(parscale = param.scale)
-        )
-        
-        # If estimating lambda add estimate of phi as actually estimating rho
+        # Find MLEs.  For lambda models reparameterizes with rho = lambda - phi
+        # >= 0 in TMB function
+        mle.res <- nlminb(start = obj$par, objective = obj$fn,
+                          gradient = obj$gr, hessian = obj$he,
+                          control = list(iter.max = 500, eval.max = 500),
+                          scale = 1 / param.scale,
+                          lower = lower.bounds, upper = upper.bounds)
+
+        # If estimating lambda add estimate of phi as TMB function actually
+        # estimating rho
         if (lambda.est) {
-          mle.res$par[lambda.par.ind] <- mle.res$par[lambda.par.ind] + mle.res$par[phi.ind]
+          mle.res$par[lambda.par.ind] <- mle.res$par[lambda.par.ind] + 
+            mle.res$par[phi.ind]
         }
         
         # print(mle.res)
         
-        # Get estimated expected numbers alive and standard errors from TMB
-        exp_n_alive <- tail(summary(sdreport(obj)), k)
-        # print(summary(sdreport(obj))^2)
-
         mle.params <- mle.res$par
         names(mle.params) <- pars.estvec
         
-        code <- mle.res$convergence == 0  ## This should be 0, for nlminb and constrOptim, if all is well.
+        code <- mle.res$convergence == 0  ## This should be 0 if all is well.
         npar <- length(mle.params)
         
-        ## Check the flag of the final estimate:
-        # This was necessary for nlm code with manual constraints where could converge to illegal value.
-        # Only need to check NA or Inf nll for nlminb, and tmb turns the resulting cpp floating point exceptions to NaN.
-        # My impression is that nlminb and constrOptim do not return such boundary nll values, but no harm in checking,
-        # and rest of the code checks for a flag value.
-        # flag.est <- is.nan(mle.res$objective) ## nlminb
-        flag.est <- is.nan(mle.res$value) ## constrOptim
-        
-        ## Calculate the AIC:  AIC = 2 * npar - 2 * max(loglike) and we want the minimum AIC.
-        ## So AIC = 2 * npar - 2 * (- min(-loglike)) = 2 * npar + 2 * min(negloglike)
-        # min.negloglike <- mle.res$objective ## nlminb
-        min.negloglike <- mle.res$value ## constrOptim
+        ## Check the flag of the final estimates. Boundary estimates might cause
+        # C++ floating point exceptions, which TMB converts to NaNs.
+        flag.est <- is.nan(mle.res$objective)
+
+        ## Calculate the AIC
+        min.negloglike <- mle.res$objective
         AIC <- 2 * npar + 2 * min.negloglike
-        ## AICc = AIC + 2 * npar * (npar + 1) / (nrow(det.dat) - npar - 1) : see the MARK manual, page 111 (4-34).
+        ## See the MARK manual, page 111 (4-34).
         AICc <- AIC + 2 * npar * (npar + 1) / (nrow(det.dat) - npar - 1)
         
         ## ------------------------------------------------------------------------------------------------------------------
-        ## Find std errors and log-Normal confidence interval for N using the inverse Hessian matrix supplied by nlm:
+        ## Find std errors using TMB:
         ## ------------------------------------------------------------------------------------------------------------------
-        var.vec <- numeric(npar)
+        var.vec <- head(summary(sdreport(obj))[, 2], npar)^2
         names(var.vec) <- paste("var", pars.estvec, sep=".")
-        
-        ## Use try() to extract the estimated variance: this step can fail sometimes.
-        # varmat <- try(solve(obj$he())) ## Analytical hessian from TMB (doesn't require parameters after optimisation)
 
-        # print(summary(sdreport(obj))[, 2]^2)
-        # print(head(summary(sdreport(obj))[, 2], npar)^2)
-        var.vec[1:npar] <- head(summary(sdreport(obj))[, 2], npar)^2
-        # If estimating lambda add variance for estimate of phi as actually estimating rho
+        # If estimating lambda get variance from TMB separately because actually
+        # estimates rho = lambda - phi.  Can't just add their variances as the
+        # estimates are correlated.
         if (lambda.est) {
           var.vec[lambda.par.ind] <- summary(sdreport(obj))[npar + 1, 2]^2
         }
-        # print(var.vec)
-        # print(summary(sdreport(obj))[, 2]^2)
         
-        # Code for investigating parameter identifiability
-        # cat("At estimates: \n")
-        # cat("Gradient", obj$gr(mle.res$par), "\n")
-        # cat("Hessian eigenvalues", eigen(obj$he(mle.res$par), only.values = T)$values, "\n")
-        # cat("Hessian rank", qr(obj$he(mle.res$par))$ran, "\n")
-        # cat("Hessian", obj$he(mle.res$par), "\n")
-        # cat("Hessian eigenvectors \n")
-        # print(eigen(obj$he(mle.res$par))$vectors)
-        
-        ## If variance has been successfully estimated, fill in the values.
-        ## Don't calculate any confidence intervals in this function: just return estimates and variances.
-        ## Confidence intervals are calculated in wrapper functions where there is an explicit argument for
-        ## confidence level.
-        # if(!inherits(varmat, "try-error")){
-        #         ## Extract an estimated variance for parvec:
-        #         ## Fill in the entries using [1:npar] because the names of this vector
-        #         ## are already established and we just want to insert the values.
-        #         var.vec[1:npar] <- diag(varmat)
-        # }
-        # else var.vec[1:npar] <- rep(NA, npar)
+        # Get estimated expected numbers alive and standard errors from TMB
+        exp_n_alive <- tail(summary(sdreport(obj)), k)
         
         ## ------------------------------------------------------------------------------------------------------------------
         ## Compile results for returning:
         ## ------------------------------------------------------------------------------------------------------------------
         all.res <- c(mle.params, var.vec, min.nll=min.negloglike, npar=npar,
-                     AIC=AIC, AICc=AICc, code=code, flag=flag.est, iter=mle.res$iterations, exp_n_alive=exp_n_alive)
+                     AIC=AIC, AICc=AICc, code=code, flag=flag.est, 
+                     iter=mle.res$iterations, exp_n_alive=exp_n_alive)
         attributes(all.res)$allparvec <- allparvec
         # print(all.res)
         all.res
