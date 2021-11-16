@@ -2832,21 +2832,15 @@ popan.func <- function(det.dat, setup.res, printit=T){
         
         # print(mle.res)
         
+        # Add names to parameter estimates
         mle.params <- mle.res$par
         names(mle.params) <- pars.estvec
         
-        code <- mle.res$convergence == 0  ## This should be 0 if all is well.
-        npar <- length(mle.params)
-        
-        ## Check the flag of the final estimates. Boundary estimates might cause
-        # C++ floating point exceptions, which TMB converts to NaNs.
-        flag.est <- is.nan(mle.res$objective)
-
-        ## Calculate the AIC
+        ## Calculate the AIC. See the MARK manual, page 111 (4-34).
         min.negloglike <- mle.res$objective
+        npar <- length(mle.params)
         AIC <- 2 * npar + 2 * min.negloglike
-        ## See the MARK manual, page 111 (4-34).
-        AICc <- AIC + 2 * npar * (npar + 1) / (nrow(det.dat) - npar - 1)
+        AICc <- AIC + 2 * npar * (npar + 1) / (nhist - npar - 1)
         
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find std errors using TMB:
@@ -2861,15 +2855,17 @@ popan.func <- function(det.dat, setup.res, printit=T){
           var.vec[lambda.par.ind] <- summary(sdreport(obj))[npar + 1, 2]^2
         }
         
-        # Get estimated expected numbers alive and standard errors from TMB
-        exp_n_alive <- tail(summary(sdreport(obj)), k)
-        
         ## ------------------------------------------------------------------------------------------------------------------
         ## Compile results for returning:
         ## ------------------------------------------------------------------------------------------------------------------
-        all.res <- c(mle.params, var.vec, min.nll=min.negloglike, npar=npar,
-                     AIC=AIC, AICc=AICc, code=code, flag=flag.est, 
-                     iter=mle.res$iterations, exp_n_alive=exp_n_alive)
+        
+        # Flag represents boundary estimates which might cause C++ floating
+        # point exceptions, which TMB converts to NaNs.
+        all.res <- c(mle.params, var.vec, min.nll = min.negloglike, npar = npar,
+                     AIC = AIC, AICc = AICc, code = mle.res$convergence == 0, 
+                     flag = is.nan(mle.res$objective), 
+                     iter = mle.res$iterations, 
+                     exp_n_alive = tail(summary(sdreport(obj)), k))
         attributes(all.res)$allparvec <- allparvec
         # print(all.res)
         all.res
