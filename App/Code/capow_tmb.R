@@ -2659,9 +2659,6 @@ popan.sim.wrap <- function(projname=NULL, Nsim=1000, modelname=NULL, simname=NUL
         resmat
 }
 
-
-
-
 ###############################################################
 
 popan.func <- function(det.dat, setup.res, printit=T){
@@ -2685,7 +2682,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         ## Extract setup results:
         ## ------------------------------------------------------------------------------------------------------------------
         k <- ncol(det.dat)
-        if(k<2) stop("negloglike.func assumes k >= 2.")
+        if(k < 2) stop("negloglike.func assumes k >= 2.")
         
         nhist <- nrow(det.dat)
         gapvec <- setup.res$gapvec
@@ -2744,8 +2741,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         non.caps.mat <- matrix(0, nrow = nhist, ncol = k)
         survive.mat <- matrix(0, nrow = nhist, ncol = k)
         
-        first.obs <- numeric(nhist)
-        last.obs <- numeric(nhist)
+        first.obs <- last.obs <- numeric(nhist)
         for(elt in 1:nhist){
                 which.1 <- which(det.dat[elt,]==1)
                 first <- min(which.1)
@@ -2764,7 +2760,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
         last.tab <- table(factor(last.obs, levels=1:k))
         survives <- colSums(survive.mat)[1:(k-1)]
 
-        # Need indices of parameters in allparvec starting from zero for the TMB C++ function
+        # Indices of parameters in allparvec starting from zero for the TMB C++ function
         allparnames <- names(allparvec)
         phiinds <- match(phinames, allparnames) - 1
         pentinds <- match(pentnames, allparnames) - 1
@@ -2773,32 +2769,32 @@ popan.func <- function(det.dat, setup.res, printit=T){
         lambdaind <- grep("lambda", allparnames) - 1
         if(length(lambdaind) == 0) lambdaind = 0
         calcind <- grep("calc", allparvec[pentinds + 1]) - 1
+        # If multiple pents are calc we calculate them all so set calcind to zero so can import as integer either way
         if(length(calcind) > 1) calcind = 0
+        
+        # If I was using rho I'd add a tag when lambda was being estimated here
+        lambda.par.ind <- match("lambda", pars.estvec)
+        lambda.est <- as.numeric(!is.na(lambda.par.ind))
         
         # Create data and parameters lists and pass to TMB to create automatically differentiated negative log likelihood function
         data <- list(k = k, lambdamodel = as.numeric(lambdamodel), gapvec = gapvec, nhist = nhist, 
                      firsttab = first.tab, lasttab = last.tab, caps = caps, noncaps = non.caps, survives = survives,
                      constvalues = constvalues, indsinsertintoallvalues = inds.insert.into.allvalues - 1,
                      whichparsintoallvalues = which.pars.into.allvalues - 1, phiinds = phiinds, pentinds = pentinds,
-                     pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind)
+                     pinds = pinds, Nind = Nind, lambdaind = lambdaind, calcind = calcind, lambdaest = lambda.est)
         
         # print(data)
         
-        parameters <- list(pars = startvals)
-        obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
-
         ## ------------------------------------------------------------------------------------------------------------------
         ## Find the MLEs:
         ## ------------------------------------------------------------------------------------------------------------------
-        # Both nlminb and constrOptim seem to work well.  I like constrOptim better for now.  
-        # If switching over remember to comment in expressions for metadata below or analysis code will fail.
-        # Some speed analysis on 5 example projects with NSim = 100:
-        # nlminb, infinite bounds, no param.scale -> user - 6.186s, faster but doesn't explicitly enforce phi <= lambda
-        # constrOptim, infinite bounds, no param.scale -> user - 8.888s, slower but feels better so I'll keep it for now
-        # constrOptim, infinite bounds, including param.scale -> user - 7.888s, nice little speedup
-        # constrOptim, finite bounds, including param.scale -> user - 7.367s, slightly faster but requires good startvals so leave it for now.
         
-        # Set bounds and parameter scale.  Most parameters are usually probabilities.
+        # nlminb and constrOptim seem to perform similarly well.  nlminb would
+        # require me to reparameterise the objective function to enforce phi <
+        # lambda.  Shouldn't be too hard.
+        
+        # Set bounds and parameter scale.  Most parameters are usually
+        # probabilities.
         npar <- length(startvals)
         upper.bounds <- rep(1, npar)
         lower.bounds <- rep(0, npar)
@@ -2807,64 +2803,35 @@ popan.func <- function(det.dat, setup.res, printit=T){
         # If N is estimated set its bounds differently.
         N.par.ind <- match("N", pars.estvec)
         if (!is.na(N.par.ind)) {
-          upper.bounds[N.par.ind] <- Inf
-          # upper.bounds[N.par.ind] <- 2 * startvals[N.par.ind]
-          lower.bounds[N.par.ind] <- nrow(det.dat)
-          param.scale[N.par.ind] <- startvals[N.par.ind]
+                upper.bounds[N.par.ind] <- Inf
+                # upper.bounds[N.par.ind] <- 2 * startvals[N.par.ind]
+                lower.bounds[N.par.ind] <- nhist
+                param.scale[N.par.ind] <- startvals[N.par.ind]
         }
         
-        # If N is estimated set its bounds differently.
-        lambda.par.ind <- match("lambda", pars.estvec)
+        # If lambda is estimated set its upper bound differently.
+        phi.ind <- grep("phi", pars.estvec)
         if (!is.na(lambda.par.ind)) {
                 upper.bounds[lambda.par.ind] <- Inf
-                # upper.bounds[lambda.par.ind] <- 2
+                # If I changed to estimating rho I'd set a different starting value here
+                startvals[lambda.par.ind] <- startvals[lambda.par.ind] - startvals[phi.ind]
+                param.scale[lambda.par.ind] <- startvals[lambda.par.ind]
         }
         
         # nlminb version
-        # You can't use this!  Without the constraint phi < lambda you get negative entry proportions!
-        # Probably especially when there are identifiability issues.
-        # mle.res <- nlminb(start = obj$par, objective = obj$fn, gradient = obj$gr, hessian = obj$he,
+        # mle.res <- nlminb(start = obj$par, objective = obj$fn, 
+        #                   gradient = obj$gr, hessian = obj$he,
         #                   control = list(iter.max = 500, eval.max = 500),
-        #                   # scale = param.scale, ## try this sometime
+        #                   scale = param.scale, ## try this sometime
         #                   lower = lower.bounds, upper = upper.bounds)
         
         # constrOptim version
         # Combine constraints into matrix and vector such that M.p - v >= 0
-        constraint.mat <- rbind(
-                diag(npar),
-                -diag(npar)
-        )
+        constraint.mat <- rbind(diag(npar), -diag(npar))
         constraint.vec <- c(lower.bounds, -upper.bounds)
-                            
-        # If phi is to be estimated in a lambda model add extra constraint phi <= lambda
-        phi.ind <- grep("phi", pars.estvec)
-        if (length(phi.ind) > 0 && lambdamodel) {
-          phi.constraint.coefs <- rep(0, npar)
-          phi.constraint.coefs[phi.ind] <- -1
-          
-          # If lambda is to be estimated use that, otherwise use the value
-          # supplied.
-          if (!is.na(lambda.par.ind)) {
-            phi.constraint.coefs[lambda.par.ind] <- 1
-            phi.constraint.val <- 0
-          } else {
-            phi.constraint.val <- as.numeric(allparvec["lambda"])
-          }
-          
-          # Add constraint
-          constraint.mat <- rbind(
-                  constraint.mat,
-                  phi.constraint.coefs
-          )
-          constraint.vec <- c(constraint.vec, phi.constraint.val)
-          # print("constraint.vec")
-          # print(constraint.vec)
-        }
 
         # Can't have Inf as a constraint with constrOptim.  Error very opaque!!!
         finite.constraint.inds <- is.finite(constraint.vec)
-        # print("finite.constraint.inds")
-        # print(finite.constraint.inds)
         constraint.mat <- constraint.mat[finite.constraint.inds, ]
         constraint.vec <- constraint.vec[finite.constraint.inds]
 
@@ -2877,21 +2844,30 @@ popan.func <- function(det.dat, setup.res, printit=T){
         #            ci = constraint.vec,
         #            control = list(parscale = param.scale)))
         
+        parameters <- list(pars = startvals)
+        obj <- MakeADFun(data, parameters, DLL = "popan", silent = T) ## silent = T later maybe
+        
         # Call optimiser
         mle.res <- constrOptim(
           theta = obj$par,
           f = obj$fn,
           grad = obj$gr,
           ui = constraint.mat,
-          ci = constraint.vec,
-          control = list(parscale = param.scale)
+          ci = constraint.vec
+          # ,
+          # control = list(parscale = param.scale)
         )
         
-        print(mle.res)
+        # If estimating lambda add estimate of phi as actually estimating rho
+        if (lambda.est) {
+          mle.res$par[lambda.par.ind] <- mle.res$par[lambda.par.ind] + mle.res$par[phi.ind]
+        }
+        
+        # print(mle.res)
         
         # Get estimated expected numbers alive and standard errors from TMB
         exp_n_alive <- tail(summary(sdreport(obj)), k)
-        # print(exp_n_alive)
+        # print(summary(sdreport(obj))^2)
 
         mle.params <- mle.res$par
         names(mle.params) <- pars.estvec
@@ -2922,8 +2898,18 @@ popan.func <- function(det.dat, setup.res, printit=T){
         names(var.vec) <- paste("var", pars.estvec, sep=".")
         
         ## Use try() to extract the estimated variance: this step can fail sometimes.
-        varmat <- try(solve(obj$he())) ## Analytical hessian from TMB (doesn't require parameters after optimisation)
+        # varmat <- try(solve(obj$he())) ## Analytical hessian from TMB (doesn't require parameters after optimisation)
 
+        # print(summary(sdreport(obj))[, 2]^2)
+        # print(head(summary(sdreport(obj))[, 2], npar)^2)
+        var.vec[1:npar] <- head(summary(sdreport(obj))[, 2], npar)^2
+        # If estimating lambda add variance for estimate of phi as actually estimating rho
+        if (lambda.est) {
+          var.vec[lambda.par.ind] <- summary(sdreport(obj))[npar + 1, 2]^2
+        }
+        # print(var.vec)
+        # print(summary(sdreport(obj))[, 2]^2)
+        
         # Code for investigating parameter identifiability
         # cat("At estimates: \n")
         # cat("Gradient", obj$gr(mle.res$par), "\n")
@@ -2937,13 +2923,13 @@ popan.func <- function(det.dat, setup.res, printit=T){
         ## Don't calculate any confidence intervals in this function: just return estimates and variances.
         ## Confidence intervals are calculated in wrapper functions where there is an explicit argument for
         ## confidence level.
-        if(!inherits(varmat, "try-error")){
-                ## Extract an estimated variance for parvec:
-                ## Fill in the entries using [1:npar] because the names of this vector
-                ## are already established and we just want to insert the values.
-                var.vec[1:npar] <- diag(varmat)
-        }
-        else var.vec[1:npar] <- rep(NA, npar)
+        # if(!inherits(varmat, "try-error")){
+        #         ## Extract an estimated variance for parvec:
+        #         ## Fill in the entries using [1:npar] because the names of this vector
+        #         ## are already established and we just want to insert the values.
+        #         var.vec[1:npar] <- diag(varmat)
+        # }
+        # else var.vec[1:npar] <- rep(NA, npar)
         
         ## ------------------------------------------------------------------------------------------------------------------
         ## Compile results for returning:

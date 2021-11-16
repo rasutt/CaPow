@@ -24,7 +24,9 @@ Type objective_function<Type>::operator() ()
   // index of lambda for lambda model, zero otherwise
   DATA_INTEGER(lambdaind); 
   // index of one calc pent value for pent model, zero otherwise
-  DATA_INTEGER(calcind); 
+  DATA_INTEGER(calcind);
+  // tag when lambda being estimated
+  DATA_INTEGER(lambdaest); 
   
   PARAMETER_VECTOR(pars);
   
@@ -59,6 +61,13 @@ Type objective_function<Type>::operator() ()
 
     // Get population growth rate
     Type lambda = allvalues(lambdaind);
+    
+    // If lambda is to be estimated, add the estimate for phi, so that TMB
+    // estimates rho instead
+    if(lambdaest == 1) {
+      lambda = lambda + phival;
+      ADREPORT(lambda);
+    }
 
     // Find entry proportions for each survey. k > 1 is required for all models.
     // The proportion entering is the proportion of population growth minus the
@@ -90,9 +99,8 @@ Type objective_function<Type>::operator() ()
   // recurrence relation starting with one for i = k, and P(survive from survey
   // i to survey i + 1 | alive at survey i).  The phi values are repeated over
   // years between surveys.
-  vector<Type> chivec(k);
+  vector<Type> chivec(k), psurvivegap(k - 1);
   chivec(k - 1) = 1;
-  vector<Type> psurvivegap(k - 1);
   for(int i = k - 2; i >= 0; i--) {
     psurvivegap(i) = pow(allvalues(phiinds(gapvec.head(i).sum())), gapvec(i));
     chivec(i) = Type(1.0) - psurvivegap(i) + psurvivegap(i) * 
@@ -102,9 +110,8 @@ Type objective_function<Type>::operator() ()
   // Find the psi parameters, P(never seen before occasion i, and alive at i)
   // and E(N_t), from recurrence relations starting with entry proportion for i
   // = 1, and superpopulation size.
-  vector<Type> psivec(k);
+  vector<Type> psivec(k), exp_n_alive(k);
   psivec(0) = pentvec(0);
-  vector<Type> exp_n_alive(k);
   exp_n_alive(0) = N * pentvec(0);
   for(int i = 1; i < k; i++) {
     psivec(i) = psivec(i - 1) * (1 - pvec(i - 1)) * psurvivegap(i - 1) + 
