@@ -1,20 +1,20 @@
 # Server logic for CaPow web app
 shinyServer(function(input, output, session) {
-  # Load main functions for app
+  # Load main functions for app.  local = T evaluates the expressions within
+  # this environment, rather than the global one, which this one can't seem to
+  # see
   source("Code/capow_tmb.R", local = T)
   # source("capow.R", local = T)
   set.seed(1)
   
-  # Load server logic for UIs.  local = T evaluates the expressions within
-  # this environment, rather than the global one, which this one can't seem to
-  # see
+  # Load server logic for UIs
   files.sources = list.files("Code/Servers", recursive = T)
   for (i in seq_along(files.sources)) {
     source(paste0("Code/Servers/", files.sources[i]), local = T)
   }
   
   # Create reactive list of reactive-value lists for objects to pass between
-  # modules
+  # modules.  Reactive values notify things when they change, like shiny inputs.
   capow_list <- reactive(
     list(
       sim_list = reactiveVal(get0("SimList", envir = CPenv)),

@@ -12,18 +12,42 @@ App runs
     - efeval - Evaluates easyfill expressions from model and sim-builders
     - HTMLnoid - Turns text into html
     - old.efeval - Jimmy's former EasyFill function with some extra shortcuts
-  - Sources other component UI's from UIs folder
+  - Sources component UI's from UIs folder
     - Main tabs of app
       - Welcome, Model, Fit, Sim, Projects, Power, Plots, Remove, and Save/Load
-      - Summary module used to display all saved objects in various tabs
+    - Summary module used to display all saved objects in various tabs
   - Creates overall UI as navBarPage with component UI's for tabs
 - Sources server.R
   - Sources capow_tmb.R
     - Loads initial saved objects from CaPow.dat
     - Compiles and loads objective function from popan.cpp
     - popan.mean.plot - Plots mean estimates compared to true values
-    - process.onepar.func - Processes results for one parameter type
+    - process.onepar.func - Processes results for one parameter type, including finding CI coverage.
     - popan.summary.func - Creates results summary table
     - ci.func - Finds confidence intervals
     - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero.
-    - 
+    - popan.boxplot - Boxplots estimates, first calling calling clean.result.func, and optionally printing info on plot including CI coverage
+    - popan.ci.plot - Plots confidence intervals, first calling calling clean.result.func, confidence limits below zero or above one are optionally reset to the limits, uses results from process.onepar.func
+    - multiproj.power.plot - Plots power results for multiple projects for a given parameter type and queried value.
+    - checkModel.func and checkSim.func - Check the model/sim supplied for any errors/inconsistencies.
+    - popan.setup.func - Sets up for simulations and model fitting.
+    - popan.sim.wrap - Gets model and sim info, calls popan.setup.func, then sims and fits datasets
+    - popan.func - Fits the model
+    - unrun.func - Removes results and sets run to zero for all projects, for testing.
+    - misc functions to work with CPenv
+    - catline - cats and adds a new line.
+    - sim.func - Simulates datasets
+    - Ns.calc.func - Finds superpopulation size given other parameters
+    - pent.calc.func - Calculates necessary entry probabilities
+    - nalive.calc.func - Finds population size and entry probabilities over time given other parameters including lambda
+    - attr_cap_hists - Attribute existing capture histories to simulated animals with appropriate life spans.
+  - Sets seed for testing
+  - Sources component servers from Servers folder
+    - Most of main tabs of app
+      - Welcome, Model, Sim, Power, Plots, Remove, and Save/Load
+    - Summary module used to display all saved objects in various tabs
+    - Sub-tabs of Project and Fit tabs 
+      - Projectbuilder and Run
+      - Upload Data, View Data, Fit Model, Population Plots, Parameter Estimates, Population Estimates, Model Comparison
+    - Creates reactive nested list of existing objects to pass between modules so they can update each other when things change while otherwise seperating namespaces.  Gets them from CPenv, which is loaded with CaPow.dat.
+    - Calls component server functions referencing corresponding UI's, some of which are contained in files for higher level components, e.g. Projects and Fit Builder.

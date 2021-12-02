@@ -666,10 +666,6 @@ popan.boxplot <- function(res.raw, plotwhat=c("phi", "p", "pent", "lambda", "N")
         ##
         ## Any results with any variances < (-threshold.negvar) are removed entirely before any plotting is done.
         ##
-        ## If impose.01limits=T, any confidence limits of probabilities that are <0 are reset to 0 and any that are >1
-        ## are reset to 1 (that means p, pent, phi);
-        ## additionally, any confidence limits of lambda or N that are <0 are reset to 0.
-        ##
         ## n.plotcol is the number of columns desired for the plot.
         ##
         ## If time.axis=T, a time axis is plotted using the time labels specified in ModelBuilder / SimBuilder.
