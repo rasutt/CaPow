@@ -6,9 +6,7 @@
 # I have modified popan.func to calculate some extra pieces, build the automatically differentiable function with them,
 # and use it to find the MLEs.
 
-# Load packages and initial objects for app 
-library(naturalsort)
-library(TMB)
+# Load initial objects for app 
 load("Data/CaPow.dat")
 
 # Compile and load popan negative log-likelihood function with TMB
@@ -2799,9 +2797,10 @@ popan.func <- function(det.dat, setup.res, printit=T){
           param.scale[N.par.ind] <- startvals[N.par.ind]
         }
         
-        # If lambda is estimated set its upper bound and parameter scale
-        # differently. The starting value and parameter scale to that for rho =
-        # lambda - phi, which is what will be optimized in TMB
+        # If lambda is estimated set its upper bound, starting value and
+        # parameter scale to that for rho = lambda - phi, which is what will be
+        # optimized in TMB.  This is much simpler than implementing the bound
+        # that lambda > phi.
         phi.ind <- grep("phi", pars.estvec)
         if (!is.na(lambda.par.ind)) {
           upper.bounds[lambda.par.ind] <- Inf

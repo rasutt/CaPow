@@ -1,5 +1,10 @@
 # UI for CaPow web app
 
+# Load packages
+library(shiny)
+library(naturalsort)
+library(TMB)
+
 # Initialize app environment.  This is now done in server for each session, but
 # it should come back when I have time to disentangle CPenv from everything
 # else.

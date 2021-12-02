@@ -1,0 +1,29 @@
+Capow outline
+
+App runs
+- Sources ui.R
+  - Loads shiny, TMB, and naturalsort packages
+  - Sources capowGUIfuncs
+    - displaySim and displayModel - For displaying saved sims and models
+    - DisplSim.func and DisplModel.func - Display all saved sims and models
+    - matLay - Generates html table for an R matrix
+    - matLayAc - Accesses matLay to add shinyUI elements
+    - extInput - Extended input accessor function for HTML input elements
+    - efeval - Evaluates easyfill expressions from model and sim-builders
+    - HTMLnoid - Turns text into html
+    - old.efeval - Jimmy's former EasyFill function with some extra shortcuts
+  - Sources other component UI's from UIs folder
+    - Main tabs of app
+      - Welcome, Model, Fit, Sim, Projects, Power, Plots, Remove, and Save/Load
+      - Summary module used to display all saved objects in various tabs
+  - Creates overall UI as navBarPage with component UI's for tabs
+- Sources server.R
+  - Sources capow_tmb.R
+    - Loads initial saved objects from CaPow.dat
+    - Compiles and loads objective function from popan.cpp
+    - popan.mean.plot - Plots mean estimates compared to true values
+    - process.onepar.func - Processes results for one parameter type
+    - popan.summary.func - Creates results summary table
+    - ci.func - Finds confidence intervals
+    - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero.
+    - 

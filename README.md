@@ -1,18 +1,22 @@
 ### CaPow!
 
-A Shiny web app for open population capture-recapture model fitting and study design via fast simulation and optimization using automatic differentiation.
+A Shiny web application for open population capture-recapture model fitting and study design via fast simulation and optimization using automatic differentiation. This repository contains the current version of the application, and some associated resources.
+
+#### How it works
+
+The application begins by running the UI and server files, which form the basis of a shiny application. They source other files which load the necessary functions and the define the UI's and server functions of the components of the app. Most of the components are the main tabs of the application, but a few are sub-components of the fit builder, projects, and save/load tabs, and one or two are re-used within various other components. Some example objects are also loaded when the application is started.
 
 #### General notes
 
--   In the first version of CaPow the model fitting often gave negative estimates of variances. After implementing it in TMB I realized that the original code was converging to false minima due to tricks used to enforce parameter bounds manually and avoid what turned out to be legitimate boundary estimates.
+-   Running pre-compile after TMB is installed speeds up compilation a lot. Should only do once as it takes a long time though it doesn't actually happen till the next time you compile a function. Doesn't matter for users because they only compile the function once.
 
--   Running precompile after TMB is installed speeds up compilation a lot. Should only do once as it takes a long time though it doesn't actually happen till the next time you compile a function. Doesn't matter for users because they only compile the function once.
+-   You may have to restart R if you recompile the objective function. Either windows or pre-compilation seems to have fixed this, but there is also a fix for linux on the TMB install github page.
 
--   You may have to restart R if you recompile the objective function. Either windows or precompilation seems to have fixed this, but there is also a fix for linux on the TMB install github page.
+-   I have had a lot of trouble with TMB not compiling or giving random errors when I re-install, but it seems to be working now. This may have been due to changing compiler settings to use certain deep learning libraries.
 
--   I have had a lot of trouble with TMB not compiling or giving random errors when I reinstall, but it seems to be working now.
+-   I started writing code to use JAX in python to find the NLL and do automatic differentiation. I made some progress but I'm not sure I got it working.
 
--   I started writing code to use jax in python to find the nll and do automatic differentiation. I made some progress but I'm not sure I got it working.
+-   The first version of CaPow sometimes converged to false minima due to tricks used to enforce parameter bounds manually and avoid boundary estimates.
 
 #### Files and folders
 

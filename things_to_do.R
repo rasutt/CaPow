@@ -2,12 +2,24 @@
 
 # *** First priority ***
 
-# Maybe add a brief description of how the code works altogether in the readme.
+# OK, so a little bit concerned about the capow code for cleaning results.  It
+# removes results where the optimiser doesn’t converge, or where it converges to
+# impossible values given the data e.g. zero probability for something that
+# actually occurred, or where the variances come out negative beyond a certain
+# tolerance.  It says it assumes that these are cases where the MLEs weren’t
+# found.  But they could also be cases where there are boundary estimates, and
+# actually with TMB it seems like we probably always find the MLEs now.  On the
+# other hand boundary estimates should be removed from confidence interval
+# coverage.
+
+# On a related note I should make sure there are checks for boundary estimates,
+# and that they are excluded from CI coverage.
+
 
 # If I don't have one already, make an example to show boundary estimates with
 # plausible variance estimates, and make sure code reports them but notes that
-# they're illegitimate.  Also one that shows failure to converge.  Write down all
-# my examples.
+# they're illegitimate.  Also one that shows failure to converge.  Write down
+# all my examples.
 
 # Tidy up MatLay function in CaPowGUIFuncs.R
 
