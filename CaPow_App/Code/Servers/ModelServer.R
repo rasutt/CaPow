@@ -131,14 +131,17 @@ ModelServer <- function(input, output, session, capow_list) {
       ## All values of phi from the last ticked survey to the end (inclusive) must be blank:
       ## in particular, the phi *at* the last ticked survey is blank:
       if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
-      ## Disable the values before the first ticked survey,
-      ## and from the last ticked survey to the end (inclusive):
+
+      # Copy phi parameters between surveys and disable input boxes apart from non-final surveys
       phidisabled <- rep(F, valTimeN)
       if(any(timeoptl)){
-        # if(min(which(timeoptl))>1) phidisabled[1:(min(which(timeoptl))-1)] <- T
-        # phidisabled[max(which(timeoptl)):valTimeN] <- T
-        phidisabled <- !timeoptl
-        phidisabled[max(which(timeoptl))] <- T
+        timeopt = which(timeoptl)
+        gapvec = diff(timeopt)
+        for (i in seq_along(gapvec)) {
+          valphi[timeopt[i]:(timeopt[i] + gapvec[i] - 1)] <- valphi[timeopt[i]]
+        }
+        phidisabled = !timeoptl
+        phidisabled[max(timeopt)] <- T
       }
     }
     

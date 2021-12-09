@@ -2,11 +2,6 @@
 
 # *** First priority ***
 
-# Error when creating standard model with survey gaps, easy-fill panel is
-# filling in a phi parameter for each time when it should be repeating the last
-# parameter from a survey in gaps.  I think I changed the easy-fill code, so
-# must've fucked it up.
-
 # Write down all my examples.
 
 # Tidy up MatLay function in CaPowGUIFuncs.R
