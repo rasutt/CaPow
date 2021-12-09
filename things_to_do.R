@@ -2,12 +2,10 @@
 
 # *** First priority ***
 
-# Sometimes when other models have been created it doesn't warn you about
-# non-identifiability.  The model-checking code doesn't seem to be working in
-# general.
-
-# Error when creating standard model for maui dataset, says phi names wrong but
-# they're right.
+# Error when creating standard model with survey gaps, easy-fill panel is
+# filling in a phi parameter for each time when it should be repeating the last
+# parameter from a survey in gaps.  I think I changed the easy-fill code, so
+# must've fucked it up.
 
 # Write down all my examples.
 

@@ -1620,6 +1620,7 @@ checkModel.func <- function(model){
     ## if any of the entries are "phi", then all of the non-numeric entries must be phi.
     
     phivec <- model$paramdf$survrate
+    print(phivec)
     
     ## Find which survival probabilities are numbers:
     ## phi.as.numbers converts all the phi's to numbers where possible:
@@ -1658,6 +1659,8 @@ checkModel.func <- function(model){
       ## Remove all times from the last ticked survey to the end (inclusive):
       include.phi.times[ rev(which(timeopt))[1] : length(include.phi.times) ] <- F
       selected.phivals <- phivec[include.phi.times & phi.not.numbers]
+      
+      print(selected.phivals)
       
       ## If any of the values in selected.phivals are blank, it probably means they don't correspond to
       ## surveys.

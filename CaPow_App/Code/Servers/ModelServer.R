@@ -135,8 +135,10 @@ ModelServer <- function(input, output, session, capow_list) {
       ## and from the last ticked survey to the end (inclusive):
       phidisabled <- rep(F, valTimeN)
       if(any(timeoptl)){
-        if(min(which(timeoptl))>1) phidisabled[1:(min(which(timeoptl))-1)] <- T
-        phidisabled[max(which(timeoptl)):valTimeN] <- T
+        # if(min(which(timeoptl))>1) phidisabled[1:(min(which(timeoptl))-1)] <- T
+        # phidisabled[max(which(timeoptl)):valTimeN] <- T
+        phidisabled <- !timeoptl
+        phidisabled[max(which(timeoptl))] <- T
       }
     }
     
