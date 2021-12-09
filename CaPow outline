@@ -3,7 +3,7 @@ Capow outline
 App runs
 - Sources ui.R
   - Loads shiny, TMB, and naturalsort packages
-  - Sources capowGUIfuncs
+  - Sources capow_ui_funcs.R
     - displaySim and displayModel - For displaying saved sims and models
     - DisplSim.func and DisplModel.func - Display all saved sims and models
     - matLay - Generates html table for an R matrix
@@ -17,15 +17,16 @@ App runs
       - Welcome, Model, Fit, Sim, Projects, Power, Plots, Remove, and Save/Load
     - Summary module used to display all saved objects in various tabs
   - Creates overall UI as navBarPage with component UI's for tabs
-- Sources server.R
-  - Sources capow_tmb.R
-    - Loads initial saved objects from CaPow.dat
-    - Compiles and loads objective function from popan.cpp
+- Sources server.R defining the server function for the overall app which is run each time a user connects
+  - Sets random number seed for testing
+  - Loads initial saved objects from capow.dat
+  - Compiles and loads objective function from popan_nll.cpp
+  - Sources capow_server_funcs.R
     - popan.mean.plot - Plots mean estimates compared to true values
-    - process.onepar.func - Processes results for one parameter type, including finding CI coverage.
+    - process.onepar.func - Processes results for one parameter type, including finding overall CI coverage rate.
     - popan.summary.func - Creates results summary table
-    - ci.func - Finds confidence intervals
-    - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero.
+    - ci.func - Finds confidence intervals, including finding coverage of given query values for each CI.
+    - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero, but convergence together with negative variance estimates doesn't seem to happen now we're using the derivatives.
     - popan.boxplot - Boxplots estimates, first calling calling clean.result.func, and optionally printing info on plot including CI coverage
     - popan.ci.plot - Plots confidence intervals, first calling calling clean.result.func, confidence limits below zero or above one are optionally reset to the limits, uses results from process.onepar.func
     - multiproj.power.plot - Plots power results for multiple projects for a given parameter type and queried value.
@@ -41,7 +42,6 @@ App runs
     - pent.calc.func - Calculates necessary entry probabilities
     - nalive.calc.func - Finds population size and entry probabilities over time given other parameters including lambda
     - attr_cap_hists - Attribute existing capture histories to simulated animals with appropriate life spans.
-  - Sets seed for testing
   - Sources component servers from Servers folder
     - Most of main tabs of app
       - Welcome, Model, Sim, Power, Plots, Remove, and Save/Load

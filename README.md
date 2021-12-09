@@ -22,19 +22,19 @@ The application begins by running the UI and server files, which form the basis 
 
 -   things_to_do.R - Old list of things to do. Should merge with this readme.
 
--   App folder - The app.
+-   CaPow_App folder - The app.
 
     -   ui.R - Code specifying GUI for app.
 
     -   server.R - Code to run app according to specified GUI.
 
-    -   popan.cpp - NLL function in C++ template for automatic differentiation with TMB.
+    -   popan_nll.cpp - NLL function in C++ template for automatic differentiation with TMB.
 
-    -   popan.o and popan.dll - Files created by compilation of popan.cpp by TMB.
+    -   popan_nll.o and popan_nll.dll - Files created by compilation of popan.cpp by TMB.
 
     -   Data folder
 
-        -   CaPow.dat - Saved capow objects loaded when the app is started as examples. I deleted the results from Example project to quickly test running projects.
+        -   capow.dat - Saved capow objects loaded when the app is started as examples. I deleted the results from Example project to quickly test running projects.
 
         -   example_dataset.csv - A simulated example dataset that can be uploaded into the app.
 
@@ -42,13 +42,13 @@ The application begins by running the UI and server files, which form the basis 
 
     -   Code folder
 
-        -   capow_tmb.R - Primary code for data simulation and model fitting using TMB.
+        -   capow_server_funcs.R - Primary code for data simulation and model fitting using TMB.
 
-        -   CaPowGUIFuncs.R - Functions creating components for GUI.
+        -   capow_ui_funcs.R - Functions creating components for GUI.
 
         -   UIs folder - Files with UIs for all main tabs, and object summary displays.
 
-        -   Servers folder - Files with code to serve all main tabs except Welcome, and object summary displays, according to specified GUIs.
+        -   Servers folder - Files with code to serve all main tabs except Welcome, and object summary displays, according to specified UIs.
 
 -   Extra folder - Code for testing, future/alternative ideas, and demonstrations.
 
