@@ -610,7 +610,7 @@ clean.result.func <- function(resdf, threshold.negvar){
   
   # Save total number of datasets
   attributes(resdf)$n_datasets = nrow(resdf)
-  
+
   ## Remove any results in res that didn't converge or that had final parameters out of range:
   resdf <- resdf[resdf$code %in% c(1, 2, 3),]
   resdf <- resdf[resdf$flag==0,]
@@ -1620,8 +1620,7 @@ checkModel.func <- function(model){
     ## if any of the entries are "phi", then all of the non-numeric entries must be phi.
     
     phivec <- model$paramdf$survrate
-    print(phivec)
-    
+
     ## Find which survival probabilities are numbers:
     ## phi.as.numbers converts all the phi's to numbers where possible:
     phi.as.numbers <- suppressWarnings(as.numeric(phivec))
@@ -1659,9 +1658,7 @@ checkModel.func <- function(model){
       ## Remove all times from the last ticked survey to the end (inclusive):
       include.phi.times[ rev(which(timeopt))[1] : length(include.phi.times) ] <- F
       selected.phivals <- phivec[include.phi.times & phi.not.numbers]
-      
-      print(selected.phivals)
-      
+
       ## If any of the values in selected.phivals are blank, it probably means they don't correspond to
       ## surveys.
       if(any(selected.phivals==""))
@@ -2807,8 +2804,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
   mle.res <- nlminb(
     start = obj$par, objective = obj$fn, gradient = obj$gr, hessian = obj$he,
     scale = 1 / obj$par, lower = lower.bounds, upper = upper.bounds,
-    control = list(iter.max = 500, eval.max = 500, 
-                   rel.tol = .Machine$double.eps)
+    control = list(iter.max = 500, eval.max = 500)
   )
   
   # If estimating lambda add estimate of phi as TMB function actually
@@ -2817,9 +2813,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
     mle.res$par[lambda.par.ind] <- mle.res$par[lambda.par.ind] + 
       mle.res$par[phi.ind]
   }
-  
-  # print(mle.res)
-  
+
   # Add names to parameter estimates
   mle.params <- mle.res$par
   names(mle.params) <- pars.estvec
@@ -2854,7 +2848,6 @@ popan.func <- function(det.dat, setup.res, printit=T){
                flag = is.nan(mle.res$objective), 
                iter = mle.res$iterations, exp_n_alive = tail(sds, k))
   attributes(all.res)$allparvec <- allparvec
-  # print(all.res)
   all.res
 }
 
@@ -3086,6 +3079,7 @@ pent.calc.func <- function(res.clean, res.setup){
   ## modelTable contains entries for survey-years only:
   modelTable <- res.setup$ModelTable[res.setup$ModelTable$survey,]
   nres <- nrow(res.clean)
+  n_datasets = attributes(res.clean)$n_datasets
   
   if(!res.setup$lambdamodel){
     ## ---------------------------------------------------------------------------------------
@@ -3151,6 +3145,7 @@ pent.calc.func <- function(res.clean, res.setup){
     ## Adjoin pent.df to res:
     res.out <- data.frame(res.clean, pent.df)
   }
+  attributes(res.out)$n_datasets <- n_datasets
   return(res.out)
 }
 
