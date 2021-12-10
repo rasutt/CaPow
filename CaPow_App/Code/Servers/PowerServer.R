@@ -232,11 +232,13 @@ PowerServer <- function(input, output, session, capow_list) {
                                         plotit=F,
                                         ## Last two arguments are not incorporated into the UI:
                                         threshold.negvar = 1e-06, impose.01limits = T)[[1]]
-            ## Beautify the table names:
-            names(tab)[names(tab)=="QueriedValue"] <- "Queried Value"
-            names(tab)[names(tab)=="OverallPower"] <- "Overall Power (%)"
-            names(tab)[names(tab)=="CIabove"] <- "CI Above (%)"
-            names(tab)[names(tab)=="CIbelow"] <- "CI Below (%)"
+            if (!is.null(tab)) {
+              ## Beautify the table names:
+              names(tab)[names(tab)=="QueriedValue"] <- "Queried Value"
+              names(tab)[names(tab)=="OverallPower"] <- "Overall Power (%)"
+              names(tab)[names(tab)=="CIabove"] <- "CI Above (%)"
+              names(tab)[names(tab)=="CIbelow"] <- "CI Below (%)"
+            }
             tab
           }, include.rownames=F)   ## End renderTable
           
@@ -259,8 +261,6 @@ PowerServer <- function(input, output, session, capow_list) {
                                  ## Last two arguments are not incorporated into the UI:
                                  threshold.negvar = 1e-06, impose.01limits = T)
           })   ## End renderPlot
-          
-          
         })   ## End local
       }  ## End i in 1:tablength
     }) ## End observeEvent

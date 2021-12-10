@@ -26,11 +26,11 @@ SaveServer <- function(input, output, session, capow_list) {
 
 # Server logic for Load module
 LoadServer <- function(input, output, session, capow_list) {
-  # Setup error message display
+  # Setup success message display
   stopMessage <- reactiveVal("")
   
-  # Display error message
-  output$errormessage <- renderText(stopMessage())
+  # Display success message
+  output$successmessage <- renderText(stopMessage())
   
   # Try to load session
   observeEvent(
@@ -43,7 +43,8 @@ LoadServer <- function(input, output, session, capow_list) {
           # Load the saved CPenv
           load(input$file$datapath)
           
-          # Somehow this superassignment writes this CPenv over the parent version 
+          # Somehow this superassignment writes this CPenv over the parent
+          # version
           CPenv <<- CPenv
           
           # Update lists
@@ -53,13 +54,12 @@ LoadServer <- function(input, output, session, capow_list) {
           capow_list()$dataset_list(get0("DatasetList", envir = CPenv))
           capow_list()$fit_list(get0("FitList", envir = CPenv))
           
-          stopMessage("")
+          stopMessage("Upload successful")
         },
         error = function(e) {
           # return a safeError if a parsing error occurs
           # I haven't seen one yet
           stop(safeError(e))
-          # stopMessage("Error loading file")
         }
       )
     }

@@ -882,7 +882,6 @@ SimServer <- function(input, output, session, capow_list) {
       ## the sim already existing follow below.
       ## Applying checkSim.func returns T or F for "checkOK", and the appropriate
       ## message to print if an error has been found:
-      print(tempSim)
       checkResult <- checkSim.func(sim=tempSim)
       
       simCheckOK <- checkResult$checkOK

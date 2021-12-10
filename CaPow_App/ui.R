@@ -24,8 +24,8 @@ shinyUI(
     FitBuilderUI(),
     SimUI(),
     ProjectsUI(),
-    PowerUI(),
     PlotUI(),
+    PowerUI(),
     RemoveUI(),
     SaveLoadUI()
   )

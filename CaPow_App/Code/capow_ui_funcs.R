@@ -161,27 +161,6 @@ matLay =
         ##  inside the Table can, as long as they have IDs).
         function(layinp, ndatarow = NULL, padding = "5px") {
                 tagList(
-                        # This stuff is giving errors
-                        # if(!is.null(ndatarow)) {
-                        #         # Loop over the data rows (if there are any) in layinp and make an HTML table
-                        #         curtab = NULL
-                        #         for(i in 1:ndatarow){
-                        #                 currow = NULL
-                        #                 for(j in 1:ncol(layinp))
-                        #                         currow = c(currow, list(tags$td(layinp[i, j],
-                        #                                                         style = paste0("padding:", padding))))
-                        #                 curtab = c(curtab, list(tags$tr(currow)))
-                        #         }
-                        #         
-                        #         # Remove the data rows from layinp
-                        #         layinp <- layinp[(ndatarow + 1):nrow(layinp)]
-                        #         
-                        #         tags$table(class = "matLay", curtab)
-                        # }, 
-                        # {
-                        #         # Rule line under data rows
-                        #         if(!is.null(ndatarow)) tags$hr()
-                        # },
                         if(!is.null(layinp) && nrow(layinp) > 0)
                         {
                                 # Loop over non-data rows and make an HTML table
@@ -212,7 +191,6 @@ matLay =
                 ## The code block above starting tags$script is added Jan 2016 and fixes
                 ## the problem that users had to type briskly into the matlay boxes or else
                 ## an endless loop might result.
-                # The commented out block was an attempt to solve the same problem for the checkboxes.
         }
 
 ################################################################
@@ -223,9 +201,7 @@ matLayAc =
         function(colTypes = NULL, colIDs = NULL, colArgs = NULL, colNames = NULL, nrow = 1,
                  ndatarow = NULL, ## number of data rows so can rule line under them
                  print.rownames=T){
-                
-                # print("matlayac")
-                
+
                 ndigits = nchar(nrow)
                 ## Check and correct for args
                 if(is.null(colTypes))

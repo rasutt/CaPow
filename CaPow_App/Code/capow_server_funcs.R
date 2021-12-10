@@ -610,7 +610,7 @@ clean.result.func <- function(resdf, threshold.negvar){
   
   # Save total number of datasets
   attributes(resdf)$n_datasets = nrow(resdf)
-
+  
   ## Remove any results in res that didn't converge or that had final parameters out of range:
   resdf <- resdf[resdf$code %in% c(1, 2, 3),]
   resdf <- resdf[resdf$flag==0,]
@@ -1314,8 +1314,6 @@ multiproj.power.plot <- function(projects=c("P11", "P13"), partype="lambda", tim
     
     details.by.time.list <- list(all = data.frame(Project=proj.keep, Description=timedescrip,
                                                   Parameter=rep(partype, length(proj.keep)), stringsAsFactors=F))
-    
-    
   } ## End partype "lambda" or "N"
   ## ---------------------------------------------------------------------------------------------
   else if(partype %in% c("phi", "pent", "p")){
@@ -1393,108 +1391,112 @@ multiproj.power.plot <- function(projects=c("P11", "P13"), partype="lambda", tim
     ## Extract which projects we are plotting for:
     details.timel <- details.by.time.list[[timel]]
     nplot <- nrow(details.timel)
-    
-    ## Prepare output columns in details.timel to be returned at the end of this function:
-    ## the CIbelow and CIabove columns contain the percentage of times the CI lies wholly below
-    ## and wholly above the queried value, respectively.
-    details.timel$QueriedValue <- rep(queryval, nplot)
-    details.timel$CIbelow <- details.timel$CIabove <- details.timel$OverallPower <- rep(NA, nplot)
-    
-    if(plotit){
-      ## --------------------------------------------------------------------------------------------------------------
-      ## Figure layout: need to do this here at the top. Projects are plotted individually in a
-      ## loop below.
-      ## Layout in n.plotcol columns with the required number of rows, plotting across rows:
-      if(is.null(n.plotcol)) n.plotcol <- nrow(details.timel)
-      nslot <- ceiling(nplot/n.plotcol)*n.plotcol
-      layout(matrix(1:nslot, nrow=ceiling(nplot/n.plotcol), ncol=n.plotcol, byrow=T),
-             widths=rep(1, nslot))
-      ## Set up the plot. Default mar is (5, 4, 4, 2) in order c(bottom, left, top, right).
-      par(mar=c(5, 3, 3, 2), mgp=c(2, 0.8, 0))
-    }
-    
-    ## --------------------------------------------------------------------------------------------------------------
-    ## Extract confidence intervals for the required parameters for each project:
-    nproj <- nrow(details.timel)
-    for(i in 1:nproj){
-      proj <- details.timel$Project[i]
-      res.proj <- res.list[[proj]]
-      descrip.proj <- details.timel$Description[i]
-      ## Use the "query.vals" argument of ci.func to test power.  query.vals needs to have the
-      ## correct name that matches the name of the parameter in this project: for example,
-      ## if the parameter is phi2 for this project, it needs to be a named vector c(phi2=0.9) or
-      ## suchlike:
-      parname.proj <- details.timel$Parameter[i]
-      query.proj <- queryval
-      names(query.proj) <- parname.proj
-      ## ciproj.df is the data frame of CI results: cihi, cilow, cover, cicode, est:
-      ciproj.df <- ci.func(res.proj, par.names=parname.proj, conf=conf, lognormal=(partype=="N"),
-                           query.vals=query.proj, include.estcolumns=T, impose.01limits=impose.01limits)
-      ## Rename the columns of ciproj.df so we only need to use its generic names, because
-      ## it's just for a single parameter:
-      ciproj.df <- ciproj.df[, c(parname.proj, paste0(c("cilow.", "cihi.", "cicode.", "cover."), parname.proj))]
-      names(ciproj.df) <- c("est", "cilow", "cihi", "cicode", "cover")
-      ciproj.df <- ciproj.df[order(ciproj.df$est),]
-      nres <- nrow(ciproj.df)
+    if (nplot > 0) {
       
-      ## Add the power results for this project to details.timel: the three columns below give percentage
-      ## performance:
-      powertab.proj <- table(factor(ciproj.df$cicode, levels=c("cib", "cia", "cic")))
-      details.timel$CIbelow[i] <- powertab.proj["cib"] / attributes(res.proj)$n_datasets * 100
-      details.timel$CIabove[i] <- powertab.proj["cia"] / attributes(res.proj)$n_datasets * 100
-      details.timel$OverallPower[i] <- details.timel$CIbelow[i] + details.timel$CIabove[i]
+      ## Prepare output columns in details.timel to be returned at the end of this function:
+      ## the CIbelow and CIabove columns contain the percentage of times the CI lies wholly below
+      ## and wholly above the queried value, respectively.
+      details.timel$QueriedValue <- rep(queryval, nplot)
+      details.timel$CIbelow <- details.timel$CIabove <- details.timel$OverallPower <- rep(NA, nplot)
       
-      ## -----------------------------------------------------------------------------------
-      ## Create the plot for Project i on the timelabel timel screen:
       if(plotit){
-        ## ------------------------------------------------------------------------------------------
-        ## Set vertical levels for text:
-        allvals <- c(unlist(ciproj.df[c("est", "cilow", "cihi")]), queryval)
-        y.lo <- min(allvals) - textspace[1]*diff(range(allvals))
-        y.hi <- max(allvals) + textspace[2]*diff(range(allvals))
-        par.ylim <- c(y.lo, y.hi)
-        
-        incr <- (y.hi - y.lo)/15
-        y.title <- y.hi - incr
-        y.gridlim.hi <- min(c(y.title - incr, max(allvals)))
-        y.gridlim.lo <- max(c(y.lo + incr, min(allvals)))
-        
-        ## ------------------------------------------------------------------------------------------
-        ## Plot the CIs ordered by the estimated value:
-        plot(1:nres, ciproj.df$cilow, pch=21, ylim=par.ylim, col=ci.colour, xlab="Simulation index",
-             ylab="Confidence interval", cex=cex.points, bg=ci.colour, cex.axis=cex.axis,
-             cex.lab=cex.axis, xlim = c(1, attributes(res.proj)$n_datasets))
-        
-        ## Gridlines if wanted:
-        if(!is.na(gridspace)){
-          grid.hvals <- seq(y.gridlim.lo-y.gridlim.lo%%gridspace, y.gridlim.hi,
-                            by=gridspace)
-          grid.hvals <- grid.hvals[(grid.hvals >= y.gridlim.lo ) & (grid.hvals <= y.gridlim.hi)]
-          if(length(grid.hvals)>0) abline(h=grid.hvals, col="grey70", lty=3)
-        }
-        
-        ## Draw in the queried value:
-        abline(h=queryval, col=query.colour, lwd=2)
-        ## Upper CIs and estimates:
-        points(1:nres, ciproj.df$cihi, pch=21, col=ci.colour, cex=cex.points, bg=ci.colour)
-        points(1:nres, ciproj.df$est, pch=16, col=est.colour, cex=cex.points)
-        
-        ## Overplot any points that are outside the CI:
-        points((1:nres)[ciproj.df$cover==0], ciproj.df$cilow[ciproj.df$cover==0], pch=21,
-               col=out.colour, cex=cex.points, bg=out.colour)
-        points((1:nres)[ciproj.df$cover==0], ciproj.df$cihi[ciproj.df$cover==0], pch=21,
-               col=out.colour, cex=cex.points, bg=out.colour)
-        ## Add the title text:
-        text((nres+1)/2, y.title, paste0(proj, ": ", descrip.proj), cex=cex.main)
-      }  ## End if(plotit)
+        ## --------------------------------------------------------------------------------------------------------------
+        ## Figure layout: need to do this here at the top. Projects are plotted individually in a
+        ## loop below.
+        ## Layout in n.plotcol columns with the required number of rows, plotting across rows:
+        if(is.null(n.plotcol)) n.plotcol <- nrow(details.timel)
+        nslot <- ceiling(nplot/n.plotcol)*n.plotcol
+        layout(matrix(1:nslot, nrow=ceiling(nplot/n.plotcol), ncol=n.plotcol, byrow=T),
+               widths=rep(1, nslot))
+        ## Set up the plot. Default mar is (5, 4, 4, 2) in order c(bottom, left, top, right).
+        par(mar=c(5, 3, 3, 2), mgp=c(2, 0.8, 0))
+      }
       
-    }  ## End project i
-    ## Pause between graphics if wanted:
-    ## if(timel != timelabels[length(timelabels)]) readline("Press return for next plot...")
-    
-    ## Return the details for time timel, ordered with the highest overall power at the top:
-    details.timel <- details.timel[order(details.timel$OverallPower, decreasing=T),]
-    return(details.timel)
+      ## --------------------------------------------------------------------------------------------------------------
+      ## Extract confidence intervals for the required parameters for each project:
+      nproj <- nrow(details.timel)
+      for(i in 1:nproj){
+        proj <- details.timel$Project[i]
+        res.proj <- res.list[[proj]]
+        descrip.proj <- details.timel$Description[i]
+        ## Use the "query.vals" argument of ci.func to test power.  query.vals needs to have the
+        ## correct name that matches the name of the parameter in this project: for example,
+        ## if the parameter is phi2 for this project, it needs to be a named vector c(phi2=0.9) or
+        ## suchlike:
+        parname.proj <- details.timel$Parameter[i]
+        query.proj <- queryval
+        names(query.proj) <- parname.proj
+        ## ciproj.df is the data frame of CI results: cihi, cilow, cover, cicode, est:
+        ciproj.df <- ci.func(res.proj, par.names=parname.proj, conf=conf, lognormal=(partype=="N"),
+                             query.vals=query.proj, include.estcolumns=T, impose.01limits=impose.01limits)
+        ## Rename the columns of ciproj.df so we only need to use its generic names, because
+        ## it's just for a single parameter:
+        ciproj.df <- ciproj.df[, c(parname.proj, paste0(c("cilow.", "cihi.", "cicode.", "cover."), parname.proj))]
+        names(ciproj.df) <- c("est", "cilow", "cihi", "cicode", "cover")
+        ciproj.df <- ciproj.df[order(ciproj.df$est),]
+        nres <- nrow(ciproj.df)
+        
+        ## Add the power results for this project to details.timel: the three columns below give percentage
+        ## performance:
+        powertab.proj <- table(factor(ciproj.df$cicode, levels=c("cib", "cia", "cic")))
+        details.timel$CIbelow[i] <- powertab.proj["cib"] / attributes(res.proj)$n_datasets * 100
+        details.timel$CIabove[i] <- powertab.proj["cia"] / attributes(res.proj)$n_datasets * 100
+        details.timel$OverallPower[i] <- details.timel$CIbelow[i] + details.timel$CIabove[i]
+        
+        ## -----------------------------------------------------------------------------------
+        ## Create the plot for Project i on the timelabel timel screen:
+        if(plotit){
+          ## ------------------------------------------------------------------------------------------
+          ## Set vertical levels for text:
+          allvals <- c(unlist(ciproj.df[c("est", "cilow", "cihi")]), queryval)
+          y.lo <- min(allvals) - textspace[1]*diff(range(allvals))
+          y.hi <- max(allvals) + textspace[2]*diff(range(allvals))
+          par.ylim <- c(y.lo, y.hi)
+          
+          incr <- (y.hi - y.lo)/15
+          y.title <- y.hi - incr
+          y.gridlim.hi <- min(c(y.title - incr, max(allvals)))
+          y.gridlim.lo <- max(c(y.lo + incr, min(allvals)))
+          
+          ## ------------------------------------------------------------------------------------------
+          ## Plot the CIs ordered by the estimated value:
+          plot(1:nres, ciproj.df$cilow, pch=21, ylim=par.ylim, col=ci.colour, xlab="Simulation index",
+               ylab="Confidence interval", cex=cex.points, bg=ci.colour, cex.axis=cex.axis,
+               cex.lab=cex.axis, xlim = c(1, attributes(res.proj)$n_datasets))
+          
+          ## Gridlines if wanted:
+          if(!is.na(gridspace)){
+            grid.hvals <- seq(y.gridlim.lo-y.gridlim.lo%%gridspace, y.gridlim.hi,
+                              by=gridspace)
+            grid.hvals <- grid.hvals[(grid.hvals >= y.gridlim.lo ) & (grid.hvals <= y.gridlim.hi)]
+            if(length(grid.hvals)>0) abline(h=grid.hvals, col="grey70", lty=3)
+          }
+          
+          ## Draw in the queried value:
+          abline(h=queryval, col=query.colour, lwd=2)
+          ## Upper CIs and estimates:
+          points(1:nres, ciproj.df$cihi, pch=21, col=ci.colour, cex=cex.points, bg=ci.colour)
+          points(1:nres, ciproj.df$est, pch=16, col=est.colour, cex=cex.points)
+          
+          ## Overplot any points that are outside the CI:
+          points((1:nres)[ciproj.df$cover==0], ciproj.df$cilow[ciproj.df$cover==0], pch=21,
+                 col=out.colour, cex=cex.points, bg=out.colour)
+          points((1:nres)[ciproj.df$cover==0], ciproj.df$cihi[ciproj.df$cover==0], pch=21,
+                 col=out.colour, cex=cex.points, bg=out.colour)
+          ## Add the title text:
+          text((nres+1)/2, y.title, paste0(proj, ": ", descrip.proj), cex=cex.main)
+        }  ## End if(plotit)
+        
+      }  ## End project i
+      ## Pause between graphics if wanted:
+      ## if(timel != timelabels[length(timelabels)]) readline("Press return for next plot...")
+      
+      ## Return the details for time timel, ordered with the highest overall power at the top:
+      details.timel <- details.timel[order(details.timel$OverallPower, decreasing=T),]
+      return(details.timel)
+    } else {
+      return(NULL)
+    }
   }  ## END OF PLOTTING FUNCTION one.timelabel.plot
   ## ------------------------------------------------------------------------------------------------
   
@@ -1503,7 +1505,6 @@ multiproj.power.plot <- function(projects=c("P11", "P13"), partype="lambda", tim
   power.res <- lapply(timelabels, one.timelabel.plot)
   names(power.res) <- timelabels
   return(power.res)
-  
 }
 
 ##############################################################
@@ -1620,7 +1621,7 @@ checkModel.func <- function(model){
     ## if any of the entries are "phi", then all of the non-numeric entries must be phi.
     
     phivec <- model$paramdf$survrate
-
+    
     ## Find which survival probabilities are numbers:
     ## phi.as.numbers converts all the phi's to numbers where possible:
     phi.as.numbers <- suppressWarnings(as.numeric(phivec))
@@ -1658,7 +1659,7 @@ checkModel.func <- function(model){
       ## Remove all times from the last ticked survey to the end (inclusive):
       include.phi.times[ rev(which(timeopt))[1] : length(include.phi.times) ] <- F
       selected.phivals <- phivec[include.phi.times & phi.not.numbers]
-
+      
       ## If any of the values in selected.phivals are blank, it probably means they don't correspond to
       ## surveys.
       if(any(selected.phivals==""))
@@ -2011,7 +2012,7 @@ checkSim.func <- function(sim){
     ## of paramdf$survrate must exist.
     phival <- sim$paramdf$survrate[min(which(sim$paramdf$timeopt))]
     is.phi.number <- (!is.na(suppressWarnings(as.numeric(phival))))
-    
+
     ## If phi is a number, check it is between 0 and 1:
     if(is.phi.number){
       phi.number <- suppressWarnings(as.numeric(phival))
@@ -2775,7 +2776,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
   npar <- length(startvals)
   upper.bounds <- rep(1, npar)
   lower.bounds <- rep(0, npar)
-
+  
   # If N is estimated set its bounds and parameter scale differently.
   N.par.ind <- match("N", pars.estvec)
   if (!is.na(N.par.ind)) {
@@ -2813,7 +2814,7 @@ popan.func <- function(det.dat, setup.res, printit=T){
     mle.res$par[lambda.par.ind] <- mle.res$par[lambda.par.ind] + 
       mle.res$par[phi.ind]
   }
-
+  
   # Add names to parameter estimates
   mle.params <- mle.res$par
   names(mle.params) <- pars.estvec

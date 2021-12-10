@@ -31,7 +31,7 @@ LoadUI <- function(id = "LoadUI", label = "LoadUI") {
   
   tabPanel(
     title = "Load Session",
-    tags$head(tags$style("#LoadUI-errormessage{color: red;}")),
+    tags$head(tags$style("#LoadUI-successmessage{color: blue;}")),
     div(
       style = "width:1070px;",
       fluidPage(
@@ -43,7 +43,7 @@ LoadUI <- function(id = "LoadUI", label = "LoadUI") {
           ),
           
           mainPanel(
-            h4(textOutput(ns("errormessage"))),
+            h4(textOutput(ns("successmessage"))),
             SummaryUI(id = ns("SummaryUI"))
           )
         )

@@ -52,7 +52,6 @@ RunUI <- function(id = "RunUI") {
             actionButton(ns("runbutton"), "Run Projects"),
             br(),
             helpText("Click Run Projects to submit projects for running."),
-            helpText("Do not close the browser until all projects have finished.  You can monitor progress in the R console.")
           ),
           ## Show the projname, the simset description, and the model description
           mainPanel(
