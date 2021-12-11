@@ -16,11 +16,14 @@ UploadUI <- function(id = "UploadUI", label = "UploadUI") {
             fileInput(
               ns("file"), "Choose CSV File (one column/survey)",
               multiple = FALSE,
-              accept = c("text/csv",
-                         "text/comma-separated-values,text/plain",
-                         ".csv")
+              accept = c(
+                "text/csv",
+                "text/comma-separated-values,text/plain",
+                ".csv"
+              )
             ),
-            checkboxInput(ns("header"), "Header", TRUE),
+            checkboxInput(ns("header"), "File includes column-names", TRUE),
+            helpText("If head of file correct confirm upload with button below"),
             actionButton(ns("uploadbutton"), "Upload Dataset")
           ),
           
@@ -72,15 +75,12 @@ FitModelUI <- function(id = "FitModelUI", label = "FitModelUI") {
             
             h4("Population Plot"),
             plotOutput(ns("Nt_plot")),
-            
             h4("Parameter Estimates"),
-            tableOutput(ns("fitresults1")),
-            
+            tableOutput(ns("parests")),
             h4("Expected Population Size"),
-            tableOutput(ns("fitresults2")),
-            
+            tableOutput(ns("popests")),
             h4("Model Comparison"),
-            tableOutput(ns("fitresults3")),
+            tableOutput(ns("modcomp")),
             
             FitSummaryUI(id = ns("FitSummaryUI"))
           )
@@ -102,7 +102,10 @@ ViewPopPlotsUI <- function(id = "ViewPopPlotsUI", label = "ViewPopPlotsUI") {
 }
 
 # UI for parameter estimates module
-ParameterEstimatesUI <- function(id = "ParameterEstimatesUI", label = "ParameterEstimatesUI") {
+ParameterEstimatesUI <- function(
+  id = "ParameterEstimatesUI", 
+  label = "ParameterEstimatesUI"
+) {
   ns <- NS(id)
   
   tabPanel(
@@ -113,7 +116,10 @@ ParameterEstimatesUI <- function(id = "ParameterEstimatesUI", label = "Parameter
 }
 
 # UI for population estimates module
-PopulationEstimatesUI <- function(id = "PopulationEstimatesUI", label = "PopulationEstimatesUI") {
+PopulationEstimatesUI <- function(
+  id = "PopulationEstimatesUI", 
+  label = "PopulationEstimatesUI"
+) {
   ns <- NS(id)
   
   tabPanel(

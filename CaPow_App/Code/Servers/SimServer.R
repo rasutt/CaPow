@@ -1,14 +1,14 @@
 SimServer <- function(input, output, session, capow_list) {
   ns <- NS("SimUI")
   
-  # # Reactive dataset and fit model selection
-  # output$fitselection <- renderUI(
-  #   selectInput(
-  #     ns("fitselected"), 
-  #     "Choose a dataset and fit model:",
-  #     choices = c("None", naturalsort(names(capow_list()$fit_list()))),
-  #     selected = "None")
-  #   )
+  # Reactive dataset and fit model selection
+  output$fitselection <- renderUI(
+    selectInput(
+      ns("fitselected"),
+      "Choose a dataset and fit model:",
+      choices = c("None", naturalsort(names(capow_list()$fit_list()))),
+      selected = "None")
+    )
     
   # Update the Ns, lambdamodel, lambda, and phi inputs to the appropriate values
   # when a dataset is selected. I also wanted to disable them with shinyjs but

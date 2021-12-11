@@ -4,7 +4,7 @@ A Shiny web application for open population capture-recapture model fitting and 
 
 #### How it works
 
-The application begins by running the UI and server files, which form the basis of a shiny application. They source other files which load the necessary functions and the define the UI's and server functions of the components of the app. Most of the components are the main tabs of the application, but a few are sub-components of the fit builder, projects, and save/load tabs, and one or two are re-used within various other components. Some example objects are also loaded when the application is started.
+The application begins by running the UI and server files, which form the basis of a shiny application. They source other files which load the necessary functions and then define the UI's and server functions of the components of the app. Most of the components are the main tabs of the application, but a few are sub-components of the fit builder, projects, and save/load tabs, and one or two are re-used within various other components. Some example objects are also loaded when the application is started. There is a more detailed outline of the code in the CaPow outline file.
 
 #### General notes
 
@@ -20,7 +20,7 @@ The application begins by running the UI and server files, which form the basis 
 
 #### Files and folders
 
--   things_to_do.R - Old list of things to do. Should merge with this readme.
+-   things_to_do.txt - List of things to do.
 
 -   CaPow_App folder - The app.
 

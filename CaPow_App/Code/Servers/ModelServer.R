@@ -1,297 +1,20 @@
 ModelServer <- function(input, output, session, capow_list) {
-  # Wanna make a reactive for display.matrix that only updates when it needs to and especially not for
-  # "survrate", "capturepr", and "prentry", which are updated by renderUI when capture occasions change.
-  # This isn't working though, it updates twice when capture occasions change and I don't know why :(
-  # Some of these functions communicate through tempModel in CPenv.
-  makedisplaymatrix <- function() isolate({
+  # Read and update the output for the matrix of temporal model parameters whenever it
+  # changes
+  output$modelParamUI <- renderUI({
     ## input$TimeN is the number of time periods.  This is given value valTimeN and set to 1 if missing:
-    # Changed to ModelTimeN
-    valTimeN = as.numeric(input$TimeN)
-    if(is.na(valTimeN)) valTimeN = 1
-    
-    ## This line is needed for opening up the initial model when first starting the interface.
-    ## tempModel will be overwritten later, but this is needed to establish the opening model.
-    # This is only overwritten with values read from the UI once it has been loaded and had these
-    # values written in and possibly updated.
-    if(exists("tempModel", envir = CPenv, inherits = FALSE))
-      tempModel = get("tempModel", envir = CPenv)
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## CREATE THE MATRIX PANEL DISPLAY
-    ## -----------------------------------------------------------------------------------------------------
-    
-    ## timeoptl = vector of True / False saying whether each time period is selected for a survey:
-    ## First try to get it from tempModel:
-    timeoptl = try(tempModel$paramdf$timeopt, silent = TRUE)
-    ## If that doesn't work or is the wrong length, replace it with FALSE everywhere:
-    if(class(timeoptl) == "try-error" || length(timeoptl) != valTimeN) timeoptl = rep(FALSE, valTimeN)
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## TIME LABELS
-    ## -----------------------------------------------------------------------------------------------------
-    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
-    if(input$modeltype=="lambdamodel"){
-      ## Time labels have to start at startTime and finish at startTime + valTimeN - 1:
-      if(input$startlambda=="" | is.na(as.numeric(input$startlambda)))
-        valTimeLabels <- seq(1,  valTimeN)
-      else
-        valTimeLabels <- seq(as.numeric(input$startlambda),
-                             as.numeric(input$startlambda) + valTimeN - 1)
-      ## All time labels boxes are disabled on the matrix for lambda models:
-      TLdisabled <- rep(T, valTimeN)
-    }
-    ## ------------------------------------------------------------------------------------------------
-    else if(input$modeltype=="singlephimodel"){
-      ## Time labels have to start at startTime and finish at startTime + valTimeN - 1:
-      if(input$startsingle =="" | is.na(as.numeric(input$startsingle)))
-        valTimeLabels <- seq(1,  valTimeN)
-      else
-        valTimeLabels <- seq(as.numeric(input$startsingle),
-                             as.numeric(input$startsingle) + valTimeN - 1)
-      ## All time labels boxes are disabled on the matrix for single-phi models:
-      TLdisabled <- rep(T, valTimeN)
-    }
-    ## ------------------------------------------------------------------------------------------------
-    else if(input$modeltype=="fullmodel"){
-      ## - If EasyFill is ticked, try to use that.
-      ## - Otherwise try to load previous values.
-      ## - If that fails (or length is not right), use failsafe defaults.
-      # eftick = try(input$efTimeLabelstick)
-      eftick = T
-      ## eftick = easy-fill ticked.  Here it's seeing whether the Time Labels checkbox on EasyFill is ticked.
-      if(class(eftick) == "try-error") eftick = FALSE
-      if(eftick){
-        ## Time Labels checkbox on EasyFill is ticked: use EasyFill Time Labels if they are OK:
-        valTimeLabels = try(efeval(input$efTimeLabels, valTimeN), silent = TRUE)
-        if(class(valTimeLabels) == "try-error") valTimeLabels = "error"
-        
-      } else{
-        ## Time Labels checkbox on EasyFill is not ticked.
-        ## Try to get the values from tempModel$paramdf:
-        valTimeLabels = try(tempModel$paramdf$timelabels, silent = TRUE)
-        ## If tempModel$paramdf gave wrong or incompatible values,
-        ## revert to defaults 2000 + (1:#times):
-        ## efeval is Jimmy's function to evaluate EasyFill expressions as advertised:
-        if(class(valTimeLabels) == "try-error" || length(valTimeLabels) != valTimeN)
-          valTimeLabels = efeval("2000 + %t", valTimeN)
-      }
-      
-      ## No time labels boxes are disabled on the matrix for full models:
-      TLdisabled <- rep(F, valTimeN)
-    }
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## SURVIVAL
-    ## -----------------------------------------------------------------------------------------------------
-    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
-    
-    if(input$modeltype=="lambdamodel"){
-      ## Survival rate has to be survratelambda:
-      valphi <- rep(input$survratelambda, valTimeN)
-      ## Any phi's strictly before the first ticked survey are blank:
-      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
-      ## All phi's from the last ticked survey to the end, inclusive, are blank:
-      ## in particular, the phi *at* the last ticked survey is blank:
-      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
-      ## All survival-rate boxes are disabled on the matrix for lambda models:
-      phidisabled <- rep(T, valTimeN)
-    }
-    ## ------------------------------------------------------------------------------------------------
-    else if(input$modeltype=="singlephimodel"){
-      ## Survival rate has to be survratesingle:
-      valphi <- rep(input$survratesingle, valTimeN)
-      ## Any phi's strictly before the first ticked survey are blank:
-      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
-      ## All phi's from the last ticked survey to the end, inclusive, are blank:
-      ## in particular, the phi *at* the last ticked survey is blank:
-      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
-      ## All survival-rate boxes are disabled on the matrix for single-phi models:
-      phidisabled <- rep(T, valTimeN)
-    }
-    ## ------------------------------------------------------------------------------------------------
-    else if(input$modeltype=="fullmodel"){
-      
-      # eftick = try(input$efsurvratetick)
-      # if(class(eftick) == "try-error") eftick = FALSE
-      eftick = T
-      if(eftick){
-        ## EasyFill is checked for survival:
-        valphi = try(efeval(input$efsurvrate, valTimeN), silent = TRUE)
-        ## EasyFill gives an error:
-        if(class(valphi) == "try-error") valphi = "error"
-      } else{
-        ## EasyFill not checked for survival: use tempModel:
-        valphi = try(tempModel$paramdf$survrate, silent = TRUE)
-        ## tempModel gives an error or is the wrong length: revert to default of "phi" everywhere:
-        if(class(valphi) == "try-error" || length(valphi) != valTimeN)
-          valphi = efeval("phi", valTimeN)
-      }
-      ## Any phi's strictly before the first ticked survey are blank:
-      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
-      ## All values of phi from the last ticked survey to the end (inclusive) must be blank:
-      ## in particular, the phi *at* the last ticked survey is blank:
-      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
-
-      # Copy phi parameters between surveys and disable input boxes apart from non-final surveys
-      phidisabled <- rep(F, valTimeN)
-      if(any(timeoptl)){
-        timeopt = which(timeoptl)
-        gapvec = diff(timeopt)
-        for (i in seq_along(gapvec)) {
-          valphi[timeopt[i]:(timeopt[i] + gapvec[i] - 1)] <- valphi[timeopt[i]]
-        }
-        phidisabled = !timeoptl
-        phidisabled[max(timeopt)] <- T
-      }
-    }
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## CAPTURE PROBABILITIES
-    ## -----------------------------------------------------------------------------------------------------
-    ## Find whether the relevant conditional-panel EasyFill is ticked:
-    if(input$modeltype=="lambdamodel") eftick <- try(input$efpticklambda)
-    # else if(input$modeltype=="singlephimodel") eftick <- try(input$efpticksingle)
-    # else if(input$modeltype=="fullmodel") eftick <- try(input$efptickfull)
-    # if(class(eftick) == "try-error") eftick = FALSE
-    eftick = T
-    
-    if(eftick){
-      ## If EasyFill is checked for capture probabilities, try to use it:
-      ## pick it out from the relevant conditional-panel EasyFill:
-      if(input$modeltype=="lambdamodel")
-        valp = try(efeval(input$efplambda, valTimeN), silent = TRUE)
-      else if(input$modeltype=="singlephimodel")
-        valp = try(efeval(input$efpsingle, valTimeN), silent = TRUE)
-      else if(input$modeltype=="fullmodel")
-        valp = try(efeval(input$efpfull, valTimeN), silent = TRUE)
-      ## If the relevant one failed, return an error:
-      if(class(valp) == "try-error") valp = "error"
-      valp <- as.character(valp)
-    } else{
-      ## If EasyFill not checked for capture probabilities, try to use the tempModel values,
-      ## but fill in the defaults for anything that is blank in the tempModel - if these are still
-      ## meant to be disabled they will be overwritten below.
-      valp = try(tempModel$paramdf$capturepr, silent = TRUE)
-      ## If the tempModel values don't work or are the wrong length, use defaults p1, ..., pk:
-      if(class(valp) == "try-error" || length(valp) != valTimeN)
-        valp = efeval("p(t)", valTimeN)
-      ## Anything in valp that is blank is replaced by defaults: this is included in case
-      ## the survey box has only just been enabled.
-      valp <- as.character(valp)
-      blankp.which <- which(valp=="")
-      if(length(blankp.which)>0) valp[blankp.which] <- paste("p", blankp.which, sep="")
-    }
-    
-    ## Work out which p boxes are disabled and set them to blank:
-    
-    ## pdisabled is the opposite of timeoptl: it is true when there is NO survey, false when there IS a survey:
-    ## pdisabled <-  as.logical(abs(timeoptl - 1))
-    pdisabled <-  (!timeoptl)
-    ## Reset disabled capture probabilities to blank:
-    valp[pdisabled] <- ""
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## ENTRY PROBABILITIES
-    ## -----------------------------------------------------------------------------------------------------
-    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
-    
-    if(input$modeltype=="lambdamodel"){
-      ## If it's a lambda survey, the pent values are "calculated" to indicate they are
-      ## calculated from lambda and phi:
-      valpent <- rep("calculated", valTimeN)
-      ## If any surveys are ticked, then ONLY these surveys should have a pent="calculated" entry.
-      ## This matches the behaviour for phi: all entries display "phi" if there are no surveys ticked,
-      ## but as soon as any surveys are ticked only the relevant entries are displayed.
-      if(any(timeoptl)) valpent[!timeoptl] <- ""
-      ## All pent boxes are disabled on the matrix for lambda models:
-      pentdisabled <- rep(T, valTimeN)
-    }
-    ## ------------------------------------------------------------------------------------------------
-    else if(input$modeltype=="singlephimodel" | input$modeltype=="fullmodel"){
-      ## For the pent-based models, find whether EasyFill pent is ticked:
-      # if(input$modeltype=="singlephimodel") eftick <- try(input$efpentticksingle)
-      # else if(input$modeltype=="fullmodel") eftick <- try(input$efpenttickfull)
-      # if(class(eftick) == "try-error") eftick = FALSE
-      eftick = T
-      
-      if(eftick){
-        ## EasyFill is checked for entry probabilities:
-        if(input$modeltype=="singlephimodel")
-          valpent = try(efeval(input$efpentsingle, valTimeN), silent = TRUE)
-        else if(input$modeltype=="fullmodel")
-          valpent = try(efeval(input$efpentfull, valTimeN), silent = TRUE)
-        ## EasyFill gives an error:
-        if(class(valpent) == "try-error") valpent = "error"
-        
-        valpent <- as.character(valpent)
-      } else{
-        ## EasyFill is not checked for entry probabilities: try to get their values from tempModel:
-        valpent = try(tempModel$paramdf$prentry, silent = TRUE)
-        ## If that fails or is the wrong length, revert to defaults of pent1, ..., pentk:
-        if(class(valpent) == "try-error" || length(valpent) != valTimeN)
-          valpent = efeval("pent(t)", valTimeN)
-        ## Anything in valpent that is blank or "calculated" is replaced by defaults: this is included
-        ## in case the survey box has only just been enabled or switched from a
-        ## lambda-POPAN model:
-        valpent <- as.character(valpent)
-        blankpent.which <- which(valpent=="" | valpent=="calculated")
-        if(length(blankpent.which)>0) valpent[blankpent.which] <-
-          paste("pent", blankpent.which, sep="")
-      }
-      
-      ## The pents are disabled if the p's are disabled, and also the pent corresponding to the first survey
-      ## must be disabled:
-      pentdisabled <- pdisabled
-      ## Replace any disabled pents with blanks:
-      valpent[pentdisabled] <- ""
-      ## Find the first survey:
-      if(any(timeoptl)) {
-        pentdisabled[min(which(timeoptl))] <- T
-        ## Replace the first-survey value of pent with "calculated":
-        valpent[min(which(timeoptl))] <- "calculated"
-      }
-    }
-    
-    ## -----------------------------------------------------------------------------------------------------
-    ## OUTPUT TABLE
-    ## -----------------------------------------------------------------------------------------------------
-    ## colArgs gives the output table:
-    colArgs = list(
-      list(type = "text", style = "width:5em", value = valTimeLabels, disabled=TLdisabled),
-      list(type = "checkbox", checked = timeoptl),
-      list(type = "text", style = "width:5em", value = valphi, disabled = phidisabled),
-      list(type = "text", style = "width:5em", value = valp, disabled = pdisabled),
-      list(type = "text", style = "width:5em", value = valpent, disabled = pentdisabled)
-    )
-    # Defines namespace for Model Builder module to use for output ids below
-    ns <- NS("ModelUI")
-    ## Creates a matrix layout that includes Shiny objects for the final output displayed:
-    matLayAc(colTypes = c("extInput", "extInput", "extInput", "extInput", "extInput"),
-             colIDs = c(ns("timelabels"), ns("timeopt"), ns("survrate"), ns("capturepr"), ns("prentry")),
-             colArgs = colArgs,
-             colNames = c("Time Labels", "", "Survival (&phi;)", "Capture Pr (p)",
-                          "Pr Entry (p<sub>ent</sub>)"),
-             nrow = valTimeN,
-             print.rownames=T)
-  })
-  displaymatrix <- reactiveVal(makedisplaymatrix())
-  dismatupdateinputs <- reactive({
-    allinputs <- reactiveValuesToList(input)
-    allnames <- names(allinputs)
-    dismatupdatenames <- allnames[-c(grep("survrate", allnames), grep("capturepr", allnames),
-                                     grep("prentry", allnames), grep("timelabels", allnames))]
-    # print(dismatupdatenames)
-    allinputs[dismatupdatenames]
-  })
-  readdisplaymatrix <- function() isolate({
-    ## input$TimeN is the number of time periods.  This is given value valTimeN and set to 1 if missing:
-    # Changed to ModelTimeN
     valTimeN = as.numeric(input$TimeN)
     if(is.na(valTimeN)) valTimeN = 1
     
     ##----------------------------------------
     ## Generate "out"
     ##----------------------------------------
+    ## This line is needed for opening up the initial model when first starting the interface.
+    ## tempModel will be overwritten later, but this is needed to establish the opening model.
+    # This is only overwritten with values read from the UI once it has been loaded and had these
+    # values written in and possibly updated.
+    if(exists("tempModel", envir = CPenv, inherits = FALSE))
+      tempModel = get("tempModel", envir = CPenv)
     
     ## This takes all the components of "input" defined in ui.R and puts them into a list, called "out":
     out = reactiveValuesToList(input)
@@ -357,20 +80,205 @@ ModelServer <- function(input, output, session, capow_list) {
       )
       assign("tempModel", tempModel, envir = CPenv)   ## Whole lot is now assigned to CPenv
     }
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## CREATE THE MATRIX PANEL DISPLAY
+    ## -----------------------------------------------------------------------------------------------------
+    
+    ## timeoptl = vector of True / False saying whether each time period is selected for a survey:
+    ## First try to get it from tempModel:
+    timeoptl = try(tempModel$paramdf$timeopt, silent = TRUE)
+    ## If that doesn't work or is the wrong length, replace it with FALSE everywhere:
+    if(class(timeoptl) == "try-error" || length(timeoptl) != valTimeN) timeoptl = rep(FALSE, valTimeN)
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## TIME LABELS
+    ## -----------------------------------------------------------------------------------------------------
+    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
+    if(input$modeltype=="lambdamodel"){
+      ## Time labels have to start at startTime and finish at startTime + valTimeN - 1:
+      if(input$startlambda=="" | is.na(as.numeric(input$startlambda)))
+        valTimeLabels <- seq(1,  valTimeN)
+      else
+        valTimeLabels <- seq(as.numeric(input$startlambda),
+                             as.numeric(input$startlambda) + valTimeN - 1)
+      ## All time labels boxes are disabled on the matrix for lambda models:
+      TLdisabled <- rep(T, valTimeN)
+    }
+    ## ------------------------------------------------------------------------------------------------
+    else if(input$modeltype=="singlephimodel"){
+      ## Time labels have to start at startTime and finish at startTime + valTimeN - 1:
+      if(input$startsingle =="" | is.na(as.numeric(input$startsingle)))
+        valTimeLabels <- seq(1,  valTimeN)
+      else
+        valTimeLabels <- seq(as.numeric(input$startsingle),
+                             as.numeric(input$startsingle) + valTimeN - 1)
+      ## All time labels boxes are disabled on the matrix for single-phi models:
+      TLdisabled <- rep(T, valTimeN)
+    }
+    ## ------------------------------------------------------------------------------------------------
+    else if(input$modeltype=="fullmodel"){
+      ## Use EasyFill Time Labels if they are OK:
+      valTimeLabels = try(efeval(input$efTimeLabels, valTimeN), silent = TRUE)
+      if(class(valTimeLabels) == "try-error") valTimeLabels = "error"
+      
+      ## No time labels boxes are disabled on the matrix for full models:
+      TLdisabled <- rep(F, valTimeN)
+    }
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## SURVIVAL
+    ## -----------------------------------------------------------------------------------------------------
+    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
+    
+    if(input$modeltype=="lambdamodel"){
+      ## Survival rate has to be survratelambda:
+      valphi <- rep(input$survratelambda, valTimeN)
+      ## Any phi's strictly before the first ticked survey are blank:
+      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
+      ## All phi's from the last ticked survey to the end, inclusive, are blank:
+      ## in particular, the phi *at* the last ticked survey is blank:
+      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
+      ## All survival-rate boxes are disabled on the matrix for lambda models:
+      phidisabled <- rep(T, valTimeN)
+    }
+    ## ------------------------------------------------------------------------------------------------
+    else if(input$modeltype=="singlephimodel"){
+      ## Survival rate has to be survratesingle:
+      valphi <- rep(input$survratesingle, valTimeN)
+      ## Any phi's strictly before the first ticked survey are blank:
+      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
+      ## All phi's from the last ticked survey to the end, inclusive, are blank:
+      ## in particular, the phi *at* the last ticked survey is blank:
+      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
+      ## All survival-rate boxes are disabled on the matrix for single-phi models:
+      phidisabled <- rep(T, valTimeN)
+    }
+    ## ------------------------------------------------------------------------------------------------
+    else if(input$modeltype=="fullmodel"){
+      
+      ## EasyFill for survival:
+      valphi = try(efeval(input$efsurvrate, valTimeN), silent = TRUE)
+      ## EasyFill gives an error:
+      if(class(valphi) == "try-error") valphi = "error"
+      
+      ## Any phi's strictly before the first ticked survey are blank:
+      if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
+      ## All values of phi from the last ticked survey to the end (inclusive) must be blank:
+      ## in particular, the phi *at* the last ticked survey is blank:
+      if(any(timeoptl)) valphi[max(which(timeoptl)):valTimeN] <- ""
+      
+      # Copy phi parameters between surveys and disable input boxes apart from non-final surveys
+      phidisabled <- rep(F, valTimeN)
+      if(any(timeoptl)){
+        timeopt = which(timeoptl)
+        gapvec = diff(timeopt)
+        for (i in seq_along(gapvec)) {
+          valphi[timeopt[i]:(timeopt[i] + gapvec[i] - 1)] <- valphi[timeopt[i]]
+        }
+        phidisabled = !timeoptl
+        phidisabled[max(timeopt)] <- T
+      }
+    }
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## CAPTURE PROBABILITIES
+    ## -----------------------------------------------------------------------------------------------------
+    ## Try to use EasyFill:
+    ## pick it out from the relevant conditional-panel EasyFill:
+    if(input$modeltype=="lambdamodel")
+      valp = try(efeval(input$efplambda, valTimeN), silent = TRUE)
+    else if(input$modeltype=="singlephimodel")
+      valp = try(efeval(input$efpsingle, valTimeN), silent = TRUE)
+    else if(input$modeltype=="fullmodel")
+      valp = try(efeval(input$efpfull, valTimeN), silent = TRUE)
+    ## If the relevant one failed, return an error:
+    if(class(valp) == "try-error") valp = "error"
+    valp <- as.character(valp)
+    
+    ## Work out which p boxes are disabled and set them to blank:
+    
+    ## pdisabled is the opposite of timeoptl: it is true when there is NO survey, false when there IS a survey:
+    ## pdisabled <-  as.logical(abs(timeoptl - 1))
+    pdisabled <-  (!timeoptl)
+    ## Reset disabled capture probabilities to blank:
+    valp[pdisabled] <- ""
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## ENTRY PROBABILITIES
+    ## -----------------------------------------------------------------------------------------------------
+    ## Go through the model types: lambda-POPAN, standard-POPAN with single phi, and full POPAN:
+    
+    if(input$modeltype=="lambdamodel"){
+      ## If it's a lambda survey, the pent values are "calculated" to indicate they are
+      ## calculated from lambda and phi:
+      valpent <- rep("calculated", valTimeN)
+      ## If any surveys are ticked, then ONLY these surveys should have a pent="calculated" entry.
+      ## This matches the behaviour for phi: all entries display "phi" if there are no surveys ticked,
+      ## but as soon as any surveys are ticked only the relevant entries are displayed.
+      if(any(timeoptl)) valpent[!timeoptl] <- ""
+      ## All pent boxes are disabled on the matrix for lambda models:
+      pentdisabled <- rep(T, valTimeN)
+    }
+    ## ------------------------------------------------------------------------------------------------
+    else if(input$modeltype=="singlephimodel" | input$modeltype=="fullmodel"){
+      
+      ## EasyFill for entry probabilities:
+      if(input$modeltype=="singlephimodel")
+        valpent = try(efeval(input$efpentsingle, valTimeN), silent = TRUE)
+      else if(input$modeltype=="fullmodel")
+        valpent = try(efeval(input$efpentfull, valTimeN), silent = TRUE)
+      ## EasyFill gives an error:
+      if(class(valpent) == "try-error") valpent = "error"
+      
+      valpent <- as.character(valpent)
+      
+      ## The pents are disabled if the p's are disabled, and also the pent corresponding to the first survey
+      ## must be disabled:
+      pentdisabled <- pdisabled
+      ## Replace any disabled pents with blanks:
+      valpent[pentdisabled] <- ""
+      ## Find the first survey:
+      if(any(timeoptl)) {
+        pentdisabled[min(which(timeoptl))] <- T
+        ## Replace the first-survey value of pent with "calculated":
+        valpent[min(which(timeoptl))] <- "calculated"
+      }
+    }
+    
+    ## -----------------------------------------------------------------------------------------------------
+    ## OUTPUT TABLE
+    ## -----------------------------------------------------------------------------------------------------
+    ## colArgs gives the output table:
+    colArgs = list(
+      list(type = "text", style = "width:5em", value = valTimeLabels, disabled=TLdisabled),
+      list(type = "checkbox", checked = timeoptl),
+      list(type = "text", style = "width:5em", value = valphi, disabled = phidisabled),
+      list(type = "text", style = "width:5em", value = valp, disabled = pdisabled),
+      list(type = "text", style = "width:5em", value = valpent, disabled = pentdisabled)
+    )
+    
+    # Defines namespace for Model Builder module to use for output ids below
+    ns <- NS("ModelUI")
+    
+    ## Creates a matrix layout that includes Shiny objects for the final output displayed:
+    matLayAc(colTypes = c("extInput", "extInput", "extInput", "extInput", "extInput"),
+             colIDs = c(ns("timelabels"), ns("timeopt"), ns("survrate"), ns("capturepr"), ns("prentry")),
+             colArgs = colArgs,
+             colNames = c("Time Labels", "", "Survival (&phi;)", "Capture Pr (p)",
+                          "Pr Entry (p<sub>ent</sub>)"),
+             nrow = valTimeN,
+             print.rownames=T)
   })
-  observeEvent(dismatupdateinputs(), {
-    # print("inputs changed")  
-    readdisplaymatrix()
-    displaymatrix(makedisplaymatrix())
-  })
-  output$modelParamUI <- renderUI(displaymatrix())
   
+  # Initialize save message
   savemessage <- reactiveVal(c("", ""))
+  
+  # When save button pushed try to save model and update save message
   observeEvent(input$saveModel, savemessage({    
     save.msg <- c("", "")
     
     ## input$TimeN is the number of time periods.  This is given value valTimeN and set to 1 if missing:
-    # Changed to ModelTimeN
     valTimeN = as.numeric(input$TimeN)
     if(is.na(valTimeN)) valTimeN = 1
     
@@ -529,7 +437,6 @@ ModelServer <- function(input, output, session, capow_list) {
               pent.firstsurv.trueval])==0)
           pent.maybe.nonidentifiable <- (pent.firstsurv.not.number & pent.unique &
                                            pent.any.est)
-          
           
           ## ------------------------------------------------------------------------
           ## Check confounding between p_k and phi_{k-1}:
@@ -775,6 +682,8 @@ ModelServer <- function(input, output, session, capow_list) {
     }  ## End of if(UI has finished loading)
     save.msg
   }))
+  
+  # Output save message reactively
   output$modelSaveMessage <- renderText({
     savemessagevec <- savemessage()
     paste("<strong><font color=\"#CC0033\">", savemessagevec[1], "</font><font color=\"#339933\">",
@@ -782,12 +691,12 @@ ModelServer <- function(input, output, session, capow_list) {
   })
   
   # Detailed reactive display of existing models
-  output$detailedmodellist <- reactive(
+  output$detailedmodellist <- reactive({
     DisplModel.func(
       names(capow_list()$model_list()), 
       capow_list()$model_list()
     )
-  )
+  })
   
   # Return reactive list of objects
   capow_list

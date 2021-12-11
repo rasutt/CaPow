@@ -11,7 +11,8 @@ ViewDataServer <- function(input, output, session, capow_list) {
     # Loop through list of datasets
     for(i in seq(along = capow_list()$dataset_list())) {
       # Make title for dataset
-      tl <- c(tl, list(h4(paste("Head of Dataset -", capow_list()$dataset_list()[[i]]$datasetname))))
+      tl <- c(tl, list(h4(paste("Head of Dataset -", 
+                                capow_list()$dataset_list()[[i]]$datasetname))))
       
       # Make table for dataset head
       tl <- c(tl, list(tableOutput(ns(paste0("dataset", i)))))

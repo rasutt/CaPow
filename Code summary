@@ -1,6 +1,6 @@
 Capow outline
 
-App runs
+App is run
 - Sources ui.R
   - Loads shiny, TMB, and naturalsort packages
   - Sources capow_ui_funcs.R
@@ -14,7 +14,15 @@ App runs
     - old.efeval - Jimmy's former EasyFill function with some extra shortcuts
   - Sources component UI's from UIs folder
     - Main tabs of app
-      - Welcome, Model, Fit, Sim, Projects, Power, Plots, Remove, and Save/Load
+      - Welcome - Title, description, video intro, and slides
+      - Model - Tabs for building and viewing models, and for explanations of how to use them
+      - Fit - Tabs for uploading and viewing data, fitting models to it, and viewing the resulting population plots, parameter estimates, population estimates, and model comparison features
+      - Sim - Tabs for building and viewing simulations, calculating the superpopulation size implied by other parameters, and for explanations of how to use them
+      - Projects - Tabs for building and running projects composed of models paired with simulations
+      - Plots - 
+      - Power - 
+      - Remove
+      - Save/Load
     - Summary module used to display all saved objects in various tabs
   - Creates overall UI as navBarPage with component UI's for tabs
 - Sources server.R defining the server function for the overall app which is run each time a user connects
@@ -26,7 +34,7 @@ App runs
     - process.onepar.func - Processes results for one parameter type, including finding overall CI coverage rate.
     - popan.summary.func - Creates results summary table
     - ci.func - Finds confidence intervals, including finding coverage of given query values for each CI.
-    - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero, but convergence together with negative variance estimates doesn't seem to happen now we're using the derivatives.
+    - clean.result.func - Removes results where optimiser did not succeed, ends at impossible values, or variance above a small negative tolerance.  Sets small negative variances to zero.
     - popan.boxplot - Boxplots estimates, first calling calling clean.result.func, and optionally printing info on plot including CI coverage
     - popan.ci.plot - Plots confidence intervals, first calling calling clean.result.func, confidence limits below zero or above one are optionally reset to the limits, uses results from process.onepar.func
     - multiproj.power.plot - Plots power results for multiple projects for a given parameter type and queried value.
@@ -44,10 +52,19 @@ App runs
     - attr_cap_hists - Attribute existing capture histories to simulated animals with appropriate life spans.
   - Sources component servers from Servers folder
     - Most of main tabs of app
-      - Welcome, Model, Sim, Power, Plots, Remove, and Save/Load
+      - Model - Reads and updates temporal parameter matrix, and tries to save model to list when button pressed 
+      - Sim
+      - Power
+      - Plots
+      - Remove
+      - Save/Load
     - Summary module used to display all saved objects in various tabs
     - Sub-tabs of Project and Fit tabs 
-      - Projectbuilder and Run
-      - Upload Data, View Data, Fit Model, Population Plots, Parameter Estimates, Population Estimates, Model Comparison
+      - Projectbuilder
+      - Run
+      - Upload Data - Shows head of dataset or error message when file selected, adds it to list when upload button pressed
+      - View Data - Shows heads of all datasets
+      - Fit Model - Allows models to be fit to datasets and shows results or error message
+      - Tabs to show Population Plots, Parameter Estimates, Population Estimates, and Model Comparison features for all fits
     - Creates reactive nested list of existing objects to pass between modules so they can update each other when things change while otherwise seperating namespaces.  Gets them from CPenv, which is loaded with CaPow.dat.
     - Calls component server functions referencing corresponding UI's, some of which are contained in files for higher level components, e.g. Projects and Fit Builder.

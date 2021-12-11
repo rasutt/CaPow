@@ -219,10 +219,10 @@ SimUI <- function(id = "SimUI", label = "SimUI") {
                 uiOutput(ns("savesimclicked"))
             ),  ## end of div for Save sim
             
-            # # Dataset and fit model selection
-            # div(style = "padding:10px; border:1px solid; width:500px; float:left;",
-            #     uiOutput(ns("fitselection"))
-            # ),  ## end of div for fit selection         
+            # Dataset and fit model selection
+            div(style = "padding:10px; border:1px solid; width:500px; float:left;",
+                uiOutput(ns("fitselection"))
+            ),  ## end of div for fit selection
             
             ## PARAMETER MATRIX DISPLAY:
             div(style = "padding:10px; border:1px solid; width:500px; float:left;",
