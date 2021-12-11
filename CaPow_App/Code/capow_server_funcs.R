@@ -3152,7 +3152,7 @@ pent.calc.func <- function(res.clean, res.setup){
 
 ############################################################
 
-# Function to get Nt and pent values from Ns, lambda, and phi.
+# Function to get E(Nt) and pent values from Ns, lambda, and phi.
 # From Rfunc.R in Rachel's Maui work.
 nalive.calc.func <- function(survs=survey.years, Ns=135.0, lambda=0.9706, phi=0.8413){
   ## nalive.calc.func 10/6/14
@@ -3177,7 +3177,7 @@ nalive.calc.func <- function(survs=survey.years, Ns=135.0, lambda=0.9706, phi=0.
   cumvec <- c(0, cumsum(gapvec))
   for(t in 2:nsurv){
     pentvec[t] <- (lambda - phi) *
-      sum(  phi^(0 : (gapvec[t-1]-1)) * lambda^((cumvec[t]-1):cumvec[t-1]))
+      sum(phi^(0 : (gapvec[t-1]-1)) * lambda^((cumvec[t]-1):cumvec[t-1]))
   }
   ## Rescale all the pents to add to 1:
   pentvec <- pentvec/sum(pentvec)

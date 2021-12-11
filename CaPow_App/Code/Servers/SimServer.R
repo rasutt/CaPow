@@ -1,23 +1,23 @@
 SimServer <- function(input, output, session, capow_list) {
+  # Create namespace for sim builder module
   ns <- NS("SimUI")
   
   # Reactive dataset and fit model selection
-  output$fitselection <- renderUI(
+  output$fitselection <- renderUI({
     selectInput(
       ns("fitselected"),
       "Choose a dataset and fit model:",
       choices = c("None", naturalsort(names(capow_list()$fit_list()))),
-      selected = "None")
+      selected = "None"
     )
-    
+  })
+  
   # Update the Ns, lambdamodel, lambda, and phi inputs to the appropriate values
-  # when a dataset is selected. I also wanted to disable them with shinyjs but
-  # couldn't make it work and doesn't seem any other nice way.  And now the
-  # param matrix doesn't update when those inputs are changed but they are still
-  # saved into the simset, which is bad...  The other option is to renderUI a
-  # new disabled input instead, but then it'll start off as null so everything
-  # that uses it will have to check and wait until it's updated...  Or I could
-  # just print warning messages...  Maybe ask R n E.
+  # when a dataset is selected. This isn't working cause the param matrix
+  # doesn't update when those inputs are changed, but apparently they are still
+  # saved into the simset. Also only implemented assuming a lambda-model and
+  # that all other parameters estimated.  See if you can figure out the errors
+  # and then maybe try generalising.
   
   # A lot of this computation is repeated in the param matrix, would be nice to
   # make a reactive to do it for both.
@@ -48,13 +48,10 @@ SimServer <- function(input, output, session, capow_list) {
       
       # Survey occasions and number of time periods
       tempSim = get("tempSim", envir = CPenv)
-      
-      # This seems like a bad idea - could be NULL with no warnings?!  Why Ns is
-      # not updating when it should?
-      timeoptl = try(tempSim$paramdf$timeopt, silent = TRUE)
+      timeoptl = try(tempSim$paramdf$timeopt, silent = F)
       timeoptl <- c(chosenModel$paramdf$timeopt, timeoptl)
       
-      # Get number of time periods input
+      # Get number of time periods input or NA
       valTimeN = suppressWarnings(as.numeric(input$TimeN))
       
       # If number of time periods NA or smaller than one set to zero
@@ -69,7 +66,7 @@ SimServer <- function(input, output, session, capow_list) {
       first_time_label <- as.numeric(chosenModel$paramdf$timelabels[1])
       valTimeLabels <- first_time_label:(first_time_label + valTimeN - 1)
       
-      # Find numbers alive in original study according to fit results
+      # Find expected numbers alive in original study according to fit results
       nalive <- nalive.calc.func(
         survs = valTimeLabels[data_surv_inds],
         Ns = data_estimates[1], ## Assuming for now that Ns was estimated 
@@ -85,7 +82,7 @@ SimServer <- function(input, output, session, capow_list) {
         phi = chosenPhi, 
         years.out = valTimeLabels[timeoptl]
       )
-
+      
       # Enter values in inputs
       updateTextInput(
         session = session, 
@@ -110,15 +107,18 @@ SimServer <- function(input, output, session, capow_list) {
       updateTextInput(
         session = session, 
         inputId = "startlambda", 
-        value = as.character(as.numeric(tail(chosenModel$paramdf$timelabels, 1)) + 1)
+        value = as.character(as.numeric(
+          tail(chosenModel$paramdf$timelabels, 1)) + 1)
       )
     }
   )
   
-  # Wanna make a reactive for display.matrix that only updates when it needs to and especially not for
-  # "survrate", "capturepr", "prentry", "pentscaled", and "Nt", which are updated by renderUI when capture occasions change.
-  # This isn't working though, it updates twice when capture occasions change and I don't know why :(
-  # Some of these functions communicate through tempModel in CPenv.
+  # Wanna make a reactive for display.matrix that only updates when it needs to
+  # and especially not for "survrate", "capturepr", "prentry", "pentscaled", and
+  # "Nt", which are updated by renderUI when capture occasions change. This
+  # isn't working though, it updates twice when capture occasions change and I
+  # don't know why :( Some of these functions communicate through tempModel in
+  # CPenv.
   makedisplaymatrix <- function() isolate({
     ## input$TimeN is the number of time periods.  This is given to valTimeN and set to 1 if missing:
     valTimeN = suppressWarnings(as.numeric(input$TimeN))
@@ -132,10 +132,6 @@ SimServer <- function(input, output, session, capow_list) {
       }
     }
     
-    # Add the number of time periods of selected fit results?  I guess I do it
-    # later, only need that here for the save function?  Feels like there should
-    # be a better way to lay all this out though for sure.
-
     ## This line is needed for opening up the initial sim when first starting the interface.
     ## tempSim will be overwritten later, but this is needed to establish the opening sim.
     if(exists("tempSim", envir = CPenv, inherits = FALSE))
@@ -148,7 +144,7 @@ SimServer <- function(input, output, session, capow_list) {
     ## timeoptl = vector of True / False saying whether each time period is selected for a survey:
     ## First try to get it from tempSim:
     timeoptl = try(tempSim$paramdf$timeopt, silent = TRUE)
-
+    
     ## If that doesn't work or is the wrong length, replace it with FALSE everywhere:
     if(class(timeoptl) == "try-error" || length(timeoptl) != valTimeN) timeoptl = rep(FALSE, valTimeN)
     
@@ -179,29 +175,9 @@ SimServer <- function(input, output, session, capow_list) {
     }
     ## ------------------------------------------------------------------------------------------------
     else if(input$simtype=="fullsim"){
-      ## - If EasyFill is ticked, try to use that.
-      ## - Otherwise try to load previous values.
-      ## - If that fails (or length is not right), use failsafe defaults.
-      # eftick = try(input$efTimeLabelstick)
-      # ## eftick = easy-fill ticked.  Here it's seeing whether the Time Labels checkbox on EasyFill is ticked.
-      # if(class(eftick) == "try-error") eftick = FALSE
-      eftick = T
-      
-      if(eftick){
-        ## Time Labels checkbox on EasyFill is ticked: use EasyFill Time Labels if they are OK:
-        valTimeLabels = try(efeval(input$efTimeLabels, valTimeN), silent = TRUE)
-        if(class(valTimeLabels) == "try-error") valTimeLabels = "error"
-        
-      } else{
-        ## Time Labels checkbox on EasyFill is not ticked.
-        ## Try to get the values from tempSim$paramdf:
-        valTimeLabels = try(tempSim$paramdf$timelabels, silent = TRUE)
-        ## If tempSim$paramdf gave wrong or incompatible values,
-        ## revert to defaults 2000 + (1:#times):
-        ## efeval is Jimmy's function to evaluate EasyFill expressions as advertised:
-        if(class(valTimeLabels) == "try-error" || length(valTimeLabels) != valTimeN)
-          valTimeLabels = efeval("2000 + %t", valTimeN)
-      }
+      ## EasyFill Time Labels
+      valTimeLabels = try(efeval(input$efTimeLabels, valTimeN), silent = TRUE)
+      if(class(valTimeLabels) == "try-error") valTimeLabels = "error"
       
       ## No time labels boxes are disabled on the matrix for full sims:
       TLdisabled <- rep(F, valTimeN)
@@ -237,23 +213,11 @@ SimServer <- function(input, output, session, capow_list) {
     }
     ## ------------------------------------------------------------------------------------------------
     else if(input$simtype=="fullsim"){
+      ## EasyFill for survival:
+      valphi = try(efeval(input$efsurvrate, valTimeN), silent = TRUE)
+      ## EasyFill gives an error:
+      if(class(valphi) == "try-error") valphi = "error"
       
-      # eftick = try(input$efsurvratetick)
-      # if(class(eftick) == "try-error") eftick = FALSE
-      eftick = T
-      
-      if(eftick){
-        ## EasyFill is checked for survival:
-        valphi = try(efeval(input$efsurvrate, valTimeN), silent = TRUE)
-        ## EasyFill gives an error:
-        if(class(valphi) == "try-error") valphi = "error"
-      } else{
-        ## EasyFill not checked for survival: use tempSim:
-        valphi = try(tempSim$paramdf$survrate, silent = TRUE)
-        ## tempSim gives an error or is the wrong length: revert to default of "0.9" everywhere:
-        if(class(valphi) == "try-error" || length(valphi) != valTimeN)
-          valphi = efeval("0.9", valTimeN)
-      }
       ## Any phi's strictly before the first ticked survey are blank:
       if(any(timeoptl)) if(min(which(timeoptl))>1) valphi[1:(min(which(timeoptl))-1)] <- ""
       ## All values of phi from the last ticked survey to the end (inclusive) must be blank:
@@ -271,47 +235,22 @@ SimServer <- function(input, output, session, capow_list) {
     ## -----------------------------------------------------------------------------------------------------
     ## CAPTURE PROBABILITIES
     ## -----------------------------------------------------------------------------------------------------
-    ## Find whether the relevant conditional-panel EasyFill is ticked:
-    # if(input$simtype=="lambdasim") eftick <- try(input$efpticklambda)
-    # else if(input$simtype=="singlephisim") eftick <- try(input$efpticksingle)
-    # else if(input$simtype=="fullsim") eftick <- try(input$efptickfull)
-    # if(class(eftick) == "try-error") eftick = FALSE
-    eftick = T
-    
-    if(eftick){
-      ## If EasyFill is checked for capture probabilities, try to use it:
-      ## pick it out from the relevant conditional-panel EasyFill:
-      if(input$simtype=="lambdasim")
-        valp = try(efeval(input$efplambda, valTimeN), silent = TRUE)
-      else if(input$simtype=="singlephisim")
-        valp = try(efeval(input$efpsingle, valTimeN), silent = TRUE)
-      else if(input$simtype=="fullsim")
-        valp = try(efeval(input$efpfull, valTimeN), silent = TRUE)
-      ## If the relevant one failed, return an error:
-      if(class(valp) == "try-error") valp = "error"
-      valp <- as.character(valp)
-    } else{
-      ## If EasyFill not checked for capture probabilities, try to use the tempSim values,
-      ## but fill in the defaults for anything that is blank in the tempSim - if these are still
-      ## meant to be disabled they will be overwritten below.
-      valp = try(tempSim$paramdf$capturepr, silent = TRUE)
-      ## If the tempSim values don't work or are the wrong length, use defaults 0.1, 0.1, ...:
-      if(class(valp) == "try-error" || length(valp) != valTimeN)
-        valp = efeval("0.1", valTimeN)
-      ## Anything in valp that is blank is replaced by defaults: this is included in case
-      ## the survey box has only just been enabled.
-      valp <- as.character(valp)
-      blankp.which <- which(valp=="")
-      if(length(blankp.which)>0) valp[blankp.which] <- "0.1"
-    }
+    ## EasyFill for capture probabilities
+    if(input$simtype=="lambdasim")
+      valp = try(efeval(input$efplambda, valTimeN), silent = TRUE)
+    else if(input$simtype=="singlephisim")
+      valp = try(efeval(input$efpsingle, valTimeN), silent = TRUE)
+    else if(input$simtype=="fullsim")
+      valp = try(efeval(input$efpfull, valTimeN), silent = TRUE)
+    ## If the relevant one failed, return an error:
+    if(class(valp) == "try-error") valp = "error"
+    valp <- as.character(valp)
     
     ## Work out which p boxes are disabled and set them to blank:
     
     ## pdisabled is the opposite of timeoptl: it is true when there is NO survey, false when there IS a survey:
-    pdisabled <-  (!timeoptl)
+    pdisabled <- !timeoptl
     ## Reset disabled capture probabilities to blank:
-    # valp[pdisabled] <- ""
-    # Quick fix here so that easy fill values slot into survey years
     valp_temp <- rep("", valTimeN)
     valp_temp[timeoptl] <- valp[1:sum(timeoptl)]
     valp <- valp_temp
@@ -356,7 +295,7 @@ SimServer <- function(input, output, session, capow_list) {
           cumvec <- c(0, cumsum(gapvec))
           for(t in 2:nsurv){
             valpent[survvec[t]] <- (lambdaval - phival) *
-              sum(  phival^(0 : (gapvec[t-1]-1)) * lambdaval^((cumvec[t]-1):cumvec[t-1]))
+              sum(phival^(0:(gapvec[t-1]-1)) * lambdaval^((cumvec[t]-1):cumvec[t-1]))
           }
           ## Rescale all the pents to add to 1: note that only rounded values are displayed and
           ## returned. Simulation code will calculate the *unrounded* values directly from lambda
@@ -376,38 +315,18 @@ SimServer <- function(input, output, session, capow_list) {
     }
     ## ------------------------------------------------------------------------------------------------
     else if(input$simtype=="singlephisim" | input$simtype=="fullsim"){
-      ## For the pent-based sim types, find whether EasyFill pent is ticked:
-      # if(input$simtype=="singlephisim") eftick <- try(input$efpentticksingle)
-      # else if(input$simtype=="fullsim") eftick <- try(input$efpenttickfull)
-      # if(class(eftick) == "try-error") eftick = FALSE
-      eftick = T
-      
-      if(eftick){
-        ## EasyFill is checked for entry probabilities:
-        if(input$simtype=="singlephisim")
-          valpent = try(efeval(input$efpentsingle, valTimeN), silent = TRUE)
-        else if(input$simtype=="fullsim")
-          valpent = try(efeval(input$efpentfull, valTimeN), silent = TRUE)
-        ## EasyFill gives an error:
-        if(class(valpent) == "try-error") valpent = "error"
-        
-        valpent <- as.character(valpent)
-      } else{
-        ## EasyFill is not checked for entry probabilities: try to get their values from tempSim:
-        valpent = try(tempSim$paramdf$prentry, silent = TRUE)
-        ## If that fails or is the wrong length, revert to defaults of 1, 1, 1, ..., 1 where k is the number
-        ## of time periods:
-        if(class(valpent) == "try-error" || length(valpent) != valTimeN)
-          valpent = efeval(paste0(rep("1", valTimeN), collapse=", "), valTimeN)
-        valpent <- as.character(valpent)
-      }
+      ## EasyFill is checked for entry probabilities:
+      if(input$simtype=="singlephisim")
+        valpent = try(efeval(input$efpentsingle, valTimeN), silent = TRUE)
+      else if(input$simtype=="fullsim")
+        valpent = try(efeval(input$efpentfull, valTimeN), silent = TRUE)
+      ## EasyFill gives an error:
+      if(class(valpent) == "try-error") valpent = "error"
       
       ## The pents are disabled if the p's are disabled, and also the pent corresponding to the first survey
       ## must be disabled:
       pentdisabled <- pdisabled
       ## Replace any disabled pents with blanks:
-      # valpent[pentdisabled] <- ""
-      # Quick fix here so that easy fill values slot into survey years
       valpent_temp <- rep("", valTimeN)
       valpent_temp[timeoptl] <- valpent[1:sum(timeoptl)]
       valpent <- valpent_temp
@@ -509,24 +428,18 @@ SimServer <- function(input, output, session, capow_list) {
       } else {
         chosenPhi <- as.numeric(chosenModel$paramdf$survrate[1])
       }
-      # print("chosenLambda")
-      # print(chosenLambda)
-      # # print("data_estimates")
-      # # print(data_estimates)
-      # print("chosenPhi")
-      # print(chosenPhi)
-      
+
       # Get number of time periods covered by existing data
       data_TimeN <- nrow(chosenModel$paramdf)
       
       # Survey occasions and number of time periods
       timeoptl <- c(chosenModel$paramdf$timeopt, timeoptl)
       valTimeN <- valTimeN + data_TimeN
-
+      
       # Time labels
       first_time_label <- as.numeric(chosenModel$paramdf$timelabels[1])
       valTimeLabels <- first_time_label:(first_time_label + valTimeN - 1)
-
+      
       # Survival probabilities
       
       # The first one in the existing vector will be blank so just remake whole
@@ -551,11 +464,9 @@ SimServer <- function(input, output, session, capow_list) {
         ), 
         nsmall=4
       )
-      # print("valp")
-      # print(valp)
-      # print("after cap probs")
-      # Entry proportions and population size
 
+      # Entry proportions and population size
+      
       # Use Ns, phi, and pent/lambda, from model fitted to existing data, to get
       # N_1.
       
@@ -568,11 +479,7 @@ SimServer <- function(input, output, session, capow_list) {
         lambda = chosenLambda,
         phi = chosenPhi
       )
-      # print("before Nsval")
-      # print("timeoptl")
-      # print(timeoptl)
-      # print("valTimeLabels")
-      # print(valTimeLabels)
+      
       # Find Ns including new surveys for sim.  
       # Should set input to this value and disable it when I get time?
       # For now, printing it might help?
@@ -602,9 +509,7 @@ SimServer <- function(input, output, session, capow_list) {
         lambda = chosenLambda,
         phi = chosenPhi
       )
-      # print("before Nts")
-      # print("nalive")
-      # print(nalive)
+
       # Place into display vectors at survey occasions
       valNt <- valpent <- rep("", valTimeN)
       # I dunno how this was working before, maybe I just didn't check???
@@ -650,10 +555,6 @@ SimServer <- function(input, output, session, capow_list) {
     # print("data_TimeN")
     # print(data_TimeN)
     
-    # Setting length of fit selected to NULL so don't try to rule a horizontal
-    # line below it since giving errors
-    data_TimeN <- NULL
-
     ## Creates a matrix layout that includes Shiny objects for the final output displayed:
     matLayAc(colTypes = rep("extInput", 7),
              colIDs = c(ns("timelabels"), ns("timeopt"), ns("survrate"), ns("capturepr"), ns("prentry"), ns("pentscaled"), ns("Nt")),
@@ -661,9 +562,6 @@ SimServer <- function(input, output, session, capow_list) {
              colNames = c("Time", "", "Survival &Phi;", "Capture p",
                           "Relative p<sub>ent</sub>", "p<sub>ent</sub>", "E(N<sub>t</sub>)"),
              nrow = valTimeN,
-             # Include number of rows for data so I can rule a line under them.
-             # Probably a cleaner way of doing this using req() or something
-             ndatarow = data_TimeN,
              print.rownames=T)
   })
   
@@ -735,7 +633,7 @@ SimServer <- function(input, output, session, capow_list) {
       } else {
         data_TimeN <- 0
       }
-
+      
       for(i in (data_TimeN + 1:valTimeN)){
         outrow = NULL
         ## Loop through each column and grab value to append to the current row, outrow:

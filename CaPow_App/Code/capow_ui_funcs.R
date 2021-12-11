@@ -200,7 +200,6 @@ matLayAc =
   ## An Accessor function for matLay for generating
   ##  complex matLay output that contains shinyUI elements.
   function(colTypes = NULL, colIDs = NULL, colArgs = NULL, colNames = NULL, nrow = 1,
-           ndatarow = NULL, ## number of data rows so can rule line under them, not actually used
            print.rownames=T){
     
     ndigits = nchar(nrow)
