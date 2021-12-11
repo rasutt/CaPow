@@ -21,8 +21,7 @@ SimServer <- function(input, output, session, capow_list) {
   
   # A lot of this computation is repeated in the param matrix, would be nice to
   # make a reactive to do it for both.
-  observeEvent(
-    input$fitselected,
+  observeEvent(input$fitselected, {
     # fitselected is renderUI input so have to check not NULL first.
     if(!(is.null(input$fitselected) || input$fitselected == "None")) {
       # Get fit results and model
@@ -111,15 +110,14 @@ SimServer <- function(input, output, session, capow_list) {
           tail(chosenModel$paramdf$timelabels, 1)) + 1)
       )
     }
-  )
+  })
   
-  # Wanna make a reactive for display.matrix that only updates when it needs to
-  # and especially not for "survrate", "capturepr", "prentry", "pentscaled", and
-  # "Nt", which are updated by renderUI when capture occasions change. This
-  # isn't working though, it updates twice when capture occasions change and I
-  # don't know why :( Some of these functions communicate through tempModel in
-  # CPenv.
-  makedisplaymatrix <- function() isolate({
+  # Read and update temporal parameter matrix.  Could be trouble reading with a
+  # fitted model now because loop over rows of "out" may go from row one to row
+  # zero.  Actually seems to be working somehow.  Great.  Dunno if it'll save
+  # properly though.  Yeah the save function doesn't consider datasets or fits
+  # at all...
+  output$simParamUI <- renderUI({
     ## input$TimeN is the number of time periods.  This is given to valTimeN and set to 1 if missing:
     valTimeN = suppressWarnings(as.numeric(input$TimeN))
     # Check if number of time periods NA or smaller than one
@@ -136,6 +134,96 @@ SimServer <- function(input, output, session, capow_list) {
     ## tempSim will be overwritten later, but this is needed to establish the opening sim.
     if(exists("tempSim", envir = CPenv, inherits = FALSE))
       tempSim = get("tempSim", envir = CPenv)
+    
+    ##----------------------------------------
+    ## Generate "out"
+    ##----------------------------------------
+    
+    ## This takes all the components of "input" defined in ui.R and puts them into a list, called "out":
+    out = reactiveValuesToList(input)
+    outnames = names(out)
+    ## Collect matLay values into data.frame:
+    ## ndigits is the number of digits in the number of time periods,
+    ## e.g. if there are 10 time periods then ndigits=2,
+    ## if there are 100 time periods then ndigits=3:
+    ndigits = nchar(valTimeN)
+    
+    ## makeregexp is a function of column ID (name of the column), and current row (currow):
+    ## e.g. if the number of time periods is in double digits (10 to 99: so ndigits=2),
+    ## then makeregexp(colIDs[1], 1) = makeregexp("timelabels", 1) = "^timelabels(01)$"
+    ## This is then used to check whether the corresponding name appears in outnames.
+    ## The ^ and $ are just placemarkers in grep's regular expression matching:
+    ## ^ means this is the beginning of the string, and $ means it is the end.  E.g.
+    ## grep("hello", "hellogoodbye") = 1
+    ## grep("^hello", "hellogoodbye") = 1 because the beginning of the strings match;
+    ## grep("^hello$", "hellogoodbye") = integer(0) because there is no match for the entire string
+    ## from beginning to end.
+    makeregexp = function(ID, currow){
+      paste0("^", ID, "(", sprintf(paste0("%0", ndigits, "d"), currow), ")$")
+    }
+    outdf = NULL
+    colIDs = c("timelabels", "timeopt",  "survrate", "capturepr", "prentry", "pentscaled", "Nt")
+    
+    ## Check if UI has finished loading:
+    ## the line below checks whether there is an entry present in "out" with name "timelabels01"
+    ## or equivalent:
+    # Changed to check for Nt to ensure reloaded after switching from model tab.  This won't work if
+    # there are other tabs with "Nt" columns.  Also model tab might not work if before sim tab?
+    # Actually interface in conditional panel not working...
+    if(length(out[grep(makeregexp(colIDs[7], 1), outnames)]) > 0){
+      ## UI has finished loading if we get inside here, so continue:
+      ## Loop through each row (time period), and *remake* the output data frame:
+      
+      # If we are simulating from existing data we need to start at the first time
+      # period after it
+      if(!(is.null(input$fitselected) || input$fitselected == "None")) {
+        chosenFit <- capow_list()$fit_list()[[input$fitselected]]
+        chosenModel <- capow_list()$model_list()[[chosenFit[["model"]]]]
+        data_TimeN <- nrow(chosenModel$paramdf)
+        # Have to check that whether the parameter matrix has updated with the selected model
+        if(length(out[grep(makeregexp(colIDs[1], data_TimeN + valTimeN), outnames)]) == 0)
+          data_TimeN <- 0
+      } else {
+        data_TimeN <- 0
+      }
+      
+      # This should be wrong when a fitted dataset is selected because valTimeN
+      # should be zero...  Seems like it only comes here when it's NA or zero
+      # and then these only apply to after the dataset stuff, and then nothing
+      # would be shown anyway...  Not sure what this is supposed to do anyway.
+      for(i in (data_TimeN + 1:valTimeN)){
+        outrow = NULL
+        ## Loop through each column and grab value to append to the current row, outrow:
+        for(curID in colIDs)
+          outrow = c(outrow, out[grep(makeregexp(curID, i), outnames)])
+        if(length(outrow) > 0){
+          names(outrow) = colIDs
+          ## Bind row values to data.frame outdf:
+          outdf = rbind(outdf, as.data.frame(outrow, stringsAsFactors=F))
+        }
+      }
+
+      ## We've now rebuilt the output data frame and called it outdf.
+
+      ## Collect remaining and do some computation
+      chosentimes = which(outdf$timeopt)
+
+      ## Only report a lambda value if it's a lambda-type sim:
+      if(out$simtype=="lambdasim") lambdareport <- out$lambdaparam
+      else lambdareport <- ""
+
+      # Changed input names to have Sim prefix
+      tempSim = list(simname = out$SimName,
+                     description = out$Description,
+                     fit = input$fitselected,
+                     chosentimes = chosentimes,
+                     gapvec = diff(chosentimes),
+                     superpopn = out$superpopn,
+                     simtype = out$simtype, ## All of these above here come from data frame out
+                     lambdaparam = lambdareport,
+                     paramdf = outdf)   ## paramdf comes from "outdf" which has just been rebuilt
+      assign("tempSim", tempSim, envir = CPenv)   ## Whole lot is now assigned to CPenv
+    }
     
     ## -----------------------------------------------------------------------------------------------------
     ## CREATE THE MATRIX PANEL DISPLAY
@@ -428,7 +516,7 @@ SimServer <- function(input, output, session, capow_list) {
       } else {
         chosenPhi <- as.numeric(chosenModel$paramdf$survrate[1])
       }
-
+      
       # Get number of time periods covered by existing data
       data_TimeN <- nrow(chosenModel$paramdf)
       
@@ -464,7 +552,7 @@ SimServer <- function(input, output, session, capow_list) {
         ), 
         nsmall=4
       )
-
+      
       # Entry proportions and population size
       
       # Use Ns, phi, and pent/lambda, from model fitted to existing data, to get
@@ -509,7 +597,7 @@ SimServer <- function(input, output, session, capow_list) {
         lambda = chosenLambda,
         phi = chosenPhi
       )
-
+      
       # Place into display vectors at survey occasions
       valNt <- valpent <- rep("", valTimeN)
       # I dunno how this was working before, maybe I just didn't check???
@@ -545,16 +633,6 @@ SimServer <- function(input, output, session, capow_list) {
     # Defines namespace for Sim Builder module to use for output ids below
     ns <- NS("SimUI")
     
-    # print("before matlayac")
-    
-    # If no fit selected then the length is NULL
-    # if(is.null(input$fitselected) || input$fitselected == "None") {
-    #   data_TimeN <- NULL
-    # }
-    
-    # print("data_TimeN")
-    # print(data_TimeN)
-    
     ## Creates a matrix layout that includes Shiny objects for the final output displayed:
     matLayAc(colTypes = rep("extInput", 7),
              colIDs = c(ns("timelabels"), ns("timeopt"), ns("survrate"), ns("capturepr"), ns("prentry"), ns("pentscaled"), ns("Nt")),
@@ -564,117 +642,6 @@ SimServer <- function(input, output, session, capow_list) {
              nrow = valTimeN,
              print.rownames=T)
   })
-  
-  displaymatrix <- reactiveVal(makedisplaymatrix())
-  
-  dismatupdateinputs <- reactive({
-    allinputs <- reactiveValuesToList(input)
-    allnames <- names(allinputs)
-    dismatupdatenames <- allnames[-c(grep("survrate", allnames), grep("capturepr", allnames),
-                                     grep("prentry", allnames), grep("timelabels", allnames),
-                                     grep("pentscaled", allnames), grep("Nt", allnames))]
-    # print(dismatupdatenames)
-    allinputs[dismatupdatenames]
-  })
-  
-  readdisplaymatrix <- function() isolate({
-    ## input$TimeN is the number of time periods.  This is given value valTimeN and set to 1 if missing:
-    valTimeN = suppressWarnings(as.numeric(input$TimeN))
-    if(is.na(valTimeN)) valTimeN = 1
-    
-    ##----------------------------------------
-    ## Generate "out"
-    ##----------------------------------------
-    
-    ## This takes all the components of "input" defined in ui.R and puts them into a list, called "out":
-    out = reactiveValuesToList(input)
-    outnames = names(out)
-    ## Collect matLay values into data.frame:
-    ## ndigits is the number of digits in the number of time periods,
-    ## e.g. if there are 10 time periods then ndigits=2,
-    ## if there are 100 time periods then ndigits=3:
-    ndigits = nchar(valTimeN)
-    
-    ## makeregexp is a function of column ID (name of the column), and current row (currow):
-    ## e.g. if the number of time periods is in double digits (10 to 99: so ndigits=2),
-    ## then makeregexp(colIDs[1], 1) = makeregexp("timelabels", 1) = "^timelabels(01)$"
-    ## This is then used to check whether the corresponding name appears in outnames.
-    ## The ^ and $ are just placemarkers in grep's regular expression matching:
-    ## ^ means this is the beginning of the string, and $ means it is the end.  E.g.
-    ## grep("hello", "hellogoodbye") = 1
-    ## grep("^hello", "hellogoodbye") = 1 because the beginning of the strings match;
-    ## grep("^hello$", "hellogoodbye") = integer(0) because there is no match for the entire string
-    ## from beginning to end.
-    makeregexp = function(ID, currow){
-      paste0("^", ID, "(", sprintf(paste0("%0", ndigits, "d"), currow), ")$")
-    }
-    outdf = NULL
-    colIDs = c("timelabels", "timeopt",  "survrate", "capturepr", "prentry", "pentscaled", "Nt")
-    
-    ## Check if UI has finished loading:
-    ## the line below checks whether there is an entry present in "out" with name "timelabels01"
-    ## or equivalent:
-    # Changed to check for Nt to ensure reloaded after switching from model tab.  This won't work if
-    # there are other tabs with "Nt" columns.  Also model tab might not work if before sim tab?
-    # Actually interface in conditional panel not working...
-    if(length(out[grep(makeregexp(colIDs[7], 1), outnames)]) > 0){
-      ## UI has finished loading if we get inside here, so continue:
-      ## Loop through each row (time period), and *remake* the output data frame:
-      
-      # If we are simulating from existing data we need to start at the first time
-      # period after it
-      if(!(is.null(input$fitselected) || input$fitselected == "None")) {
-        chosenFit <- capow_list()$fit_list()[[input$fitselected]]
-        chosenModel <- capow_list()$model_list()[[chosenFit[["model"]]]]
-        data_TimeN <- nrow(chosenModel$paramdf)
-        # Have to check that whether the parameter matrix has updated with the selected model
-        if(length(out[grep(makeregexp(colIDs[1], data_TimeN + valTimeN), outnames)]) == 0)
-          data_TimeN <- 0
-      } else {
-        data_TimeN <- 0
-      }
-      
-      for(i in (data_TimeN + 1:valTimeN)){
-        outrow = NULL
-        ## Loop through each column and grab value to append to the current row, outrow:
-        for(curID in colIDs)
-          outrow = c(outrow, out[grep(makeregexp(curID, i), outnames)])
-        if(length(outrow) > 0){
-          names(outrow) = colIDs
-          ## Bind row values to data.frame outdf:
-          outdf = rbind(outdf, as.data.frame(outrow, stringsAsFactors=F))
-        }
-      }
-      
-      ## We've now rebuilt the output data frame and called it outdf.
-      
-      ## Collect remaining and do some computation
-      chosentimes = which(outdf$timeopt)
-      
-      ## Only report a lambda value if it's a lambda-type sim:
-      if(out$simtype=="lambdasim") lambdareport <- out$lambdaparam
-      else lambdareport <- ""
-      
-      # Changed input names to have Sim prefix
-      tempSim = list(simname = out$SimName,
-                     description = out$Description,
-                     fit = input$fitselected,
-                     chosentimes = chosentimes,
-                     gapvec = diff(chosentimes),
-                     superpopn = out$superpopn,
-                     simtype = out$simtype, ## All of these above here come from data frame out
-                     lambdaparam = lambdareport,
-                     paramdf = outdf)   ## paramdf comes from "outdf" which has just been rebuilt
-      assign("tempSim", tempSim, envir = CPenv)   ## Whole lot is now assigned to CPenv
-    }
-  })
-  
-  observeEvent(dismatupdateinputs(), {
-    readdisplaymatrix()
-    displaymatrix(makedisplaymatrix())
-  })
-  
-  output$simParamUI <- renderUI(displaymatrix())
   
   # Try to save sim when button clicked
   savemessage <- reactiveVal(c("", ""))
@@ -993,12 +960,12 @@ SimServer <- function(input, output, session, capow_list) {
   })
   
   # Detailed reactive display of existing sims
-  output$detailedsimlist <- reactive(
+  output$detailedsimlist <- reactive({
     DisplSim.func(
       names(capow_list()$sim_list()),
       capow_list()$sim_list()
     )
-  )
+  })
   
   # Return reactive list of objects
   capow_list
